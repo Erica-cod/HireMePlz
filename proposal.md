@@ -19,7 +19,7 @@ Applying for software engineering jobs in North America is a tedious, repetitive
 
 Existing solutions fall short in key ways. Browser-native autofill only handles basic fields like name and email, and fails when form structures vary. LinkedIn Easy Apply simplifies applications on LinkedIn itself, but most companies - especially mid-size and large firms - use their own career portals (Greenhouse, Lever, Workday), where Easy Apply is unavailable. Tools like Simplify Jobs offer partial autofill for structured fields but completely lack intelligent handling of open-ended questions, which are often the most time-consuming part of an application.
 
-**JobFill** addresses this gap by combining a Chrome extension with a cloud-native backend:
+**HireMePlz** addresses this gap by combining a Chrome extension with a cloud-native backend:
 
 - **Smart autofill** for structured fields (name, email, education, etc.) with intelligent field detection across different portal layouts
 - **LLM-powered answers** for open-ended questions, drawing from a user's personal experience library to generate contextually relevant responses
