@@ -1,6 +1,6 @@
-# Project Proposal: JobFill — Intelligent Job Application Autofill Platform
+# Project Proposal: HireMePlz - Intelligent Job Application Autofill Platform
 
-**Course**: ECE1779 — Cloud Computing
+**Course**: ECE1779 - Cloud Computing
 
 **Team Members**:
 
@@ -15,9 +15,9 @@
 
 ## 1. Motivation
 
-Applying for software engineering jobs in North America is a tedious, repetitive process. Job seekers — especially international students and new graduates — often submit 50 to 200+ applications across different company career portals. Each application requires manually entering the same personal information (name, email, phone, education, work history) and answering open-ended questions ("Describe your most challenging project," "Why do you want to join us?"). Despite asking semantically similar questions, every portal uses different form layouts, field names, and phrasing, making browser-native autofill unreliable.
+Applying for software engineering jobs in North America is a tedious, repetitive process. Job seekers - especially new graduates - often submit 50 to 200+ applications across different company career portals. Each application requires manually entering the same personal information (name, email, phone, education, work history) and answering open-ended questions ("Describe your most challenging project," "Why do you want to join us?"). Despite asking semantically similar questions, every portal uses different form layouts, field names, and phrasing, making browser-native autofill unreliable.
 
-Existing solutions fall short in key ways. Browser-native autofill only handles basic fields like name and email, and fails when form structures vary. LinkedIn Easy Apply simplifies applications on LinkedIn itself, but most companies — especially mid-size and large firms — use their own career portals (Greenhouse, Lever, Workday), where Easy Apply is unavailable. Tools like Simplify Jobs offer partial autofill for structured fields but completely lack intelligent handling of open-ended questions, which are often the most time-consuming part of an application.
+Existing solutions fall short in key ways. Browser-native autofill only handles basic fields like name and email, and fails when form structures vary. LinkedIn Easy Apply simplifies applications on LinkedIn itself, but most companies - especially mid-size and large firms - use their own career portals (Greenhouse, Lever, Workday), where Easy Apply is unavailable. Tools like Simplify Jobs offer partial autofill for structured fields but completely lack intelligent handling of open-ended questions, which are often the most time-consuming part of an application.
 
 **JobFill** addresses this gap by combining a Chrome extension with a cloud-native backend:
 
@@ -26,7 +26,7 @@ Existing solutions fall short in key ways. Browser-native autofill only handles 
 - **Job discovery** via public job APIs to surface matching positions based on the user's skills and preferences
 - **Application tracking** to record submission history and visualize progress
 
-Our target users are software engineering job seekers in the North American market — primarily university students, recent graduates, and early-career professionals who submit high volumes of applications across diverse company portals.
+Our target users are software engineering job seekers in the North American market - primarily university students, recent graduates, and early-career professionals who submit high volumes of applications across diverse company portals.
 
 ---
 
@@ -44,7 +44,7 @@ Build a stateful cloud-native application that helps job seekers autofill applic
 
 **Job Discovery and Matching**: A background worker periodically fetches job listings from public APIs (JSearch, Adzuna) based on user preferences (target roles, locations). Jobs are matched against the user's skill set and ranked by relevance. High-scoring matches trigger notifications.
 
-**Application Tracking**: Each autofill session is recorded — company, position, URL, date, and a snapshot of filled content. Users can view their application history and update statuses (applied, interviewing, rejected, offer) through the web dashboard.
+**Application Tracking**: Each autofill session is recorded - company, position, URL, date, and a snapshot of filled content. Users can view their application history and update statuses (applied, interviewing, rejected, offer) through the web dashboard.
 
 ### Technical Requirements
 
@@ -82,13 +82,13 @@ The project is scoped for a 4-person team over approximately one month. The Chro
 
 ### Week-by-Week Plan
 
-**Week 1 — Foundation**: Set up the development environment. Build the project skeleton — Express.js backend, Next.js frontend, Chrome extension manifest, PostgreSQL schema. Get all services running locally via Docker Compose.
+**Week 1 - Foundation**: Set up the development environment. Build the project skeleton - Express.js backend, Next.js frontend, Chrome extension manifest, PostgreSQL schema. Get all services running locally via Docker Compose.
 
-**Week 2 — Core Features**: Implement profile and experience management APIs. Build the autofill engine (rule-based matching + LLM integration). Develop the Chrome extension's form detection and filling logic. Build web dashboard pages.
+**Week 2 - Core Features**: Implement profile and experience management APIs. Build the autofill engine (rule-based matching + LLM integration). Develop the Chrome extension's form detection and filling logic. Build web dashboard pages.
 
-**Week 3 — Deployment + Advanced Features**: Deploy to DigitalOcean with Docker Swarm. Set up monitoring and alerts. Configure CI/CD with GitHub Actions. Integrate job fetching, matching, and email notifications.
+**Week 3 - Deployment + Advanced Features**: Deploy to DigitalOcean with Docker Swarm. Set up monitoring and alerts. Configure CI/CD with GitHub Actions. Integrate job fetching, matching, and email notifications.
 
-**Week 4 — Polish + Deliverables**: Testing and bug fixes. Record demo video. Write final report (`README.md`) and AI interaction record (`ai-session.md`). Prepare presentation slides.
+**Week 4 - Polish + Deliverables**: Testing and bug fixes. Record demo video. Write final report (`README.md`) and AI interaction record (`ai-session.md`). Prepare presentation slides.
 
 ---
 
@@ -100,7 +100,7 @@ Our team chose **DigitalOcean** because several members had prior experience wit
 
 ### Anticipated Challenges
 
-We expected the **Chrome extension's form detection** to be the hardest part. Job portals use inconsistent HTML structures — some use standard `<form>` elements while others use JavaScript-rendered UIs with non-standard attributes. We planned to focus on one major ATS platform first and build a generic fallback. The second challenge we identified was **LLM response quality** — generating answers that sound natural and specific rather than generic from a limited experience library.
+We expected the **Chrome extension's form detection** to be the hardest part. Job portals use inconsistent HTML structures - some use standard `<form>` elements while others use JavaScript-rendered UIs with non-standard attributes. We planned to focus on one major ATS platform first and build a generic fallback. The second challenge we identified was **LLM response quality** - generating answers that sound natural and specific rather than generic from a limited experience library.
 
 ### Early Development Approach
 
@@ -127,5 +127,5 @@ We used AI (Claude) to help with:
 AI suggested using OpenAI's GPT-4o-mini for question answering. Before adopting this, our team discussed tradeoffs:
 
 - **Cost vs. capability**: GPT-4o-mini is inexpensive ($0.15/1M tokens) and sufficient for our needs. We considered self-hosted alternatives (e.g., Llama) but decided they add unnecessary infrastructure complexity for a course project.
-- **Privacy**: Sending user experiences to an external API raises concerns. We accepted this for the course project scope but noted it as a design limitation — a production system might require on-device inference.
+- **Privacy**: Sending user experiences to an external API raises concerns. We accepted this for the course project scope but noted it as a design limitation - a production system might require on-device inference.
 - **Latency**: 1–2 second response times are acceptable if we show a loading indicator and let users edit before filling.
