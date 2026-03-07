@@ -1,0 +1,99 @@
+import { StoryCategory } from "@prisma/client";
+import { Router } from "express";
+import { z } from "zod";
+
+import { prisma } from "../../lib/prisma.js";
+import {
+  AuthenticatedRequest,
+  requireAuth
+} from "../../middleware/auth.js";
+
+const router = Router();
+
+const storySchema = z.object({
+  title: z.string().min(1),
+  category: z.nativeEnum(StoryCategory),
+  promptTags: z.array(z.string()).default([]),
+  situation: z.string().min(1),
+  task: z.string().optional().nullable(),
+  action: z.string().min(1),
+  result: z.string().min(1)
+});
+
+router.get(
+  "/",
+  requireAuth,
+  async (request: AuthenticatedRequest, response) => {
+    const stories = await prisma.storyItem.findMany({
+      where: { userId: request.userId },
+      orderBy: { updatedAt: "desc" }
+    });
+
+    response.json({ stories });
+  }
+);
+
+router.post(
+  "/",
+  requireAuth,
+  async (request: AuthenticatedRequest, response) => {
+    const payload = storySchema.parse(request.body);
+
+    const story = await prisma.storyItem.create({
+      data: {
+        userId: request.userId!,
+        ...payload
+      }
+    });
+
+    response.status(201).json({ story });
+  }
+);
+
+router.put(
+  "/:storyId",
+  requireAuth,
+  async (request: AuthenticatedRequest, response) => {
+    const storyId = String(request.params.storyId);
+    const payload = storySchema.parse(request.body);
+    const existing = await prisma.storyItem.findFirst({
+      where: { id: storyId, userId: request.userId }
+    });
+
+    if (!existing) {
+      response.status(404).json({ message: "Story record not found" });
+      return;
+    }
+
+    const story = await prisma.storyItem.update({
+      where: { id: existing.id },
+      data: payload
+    });
+
+    response.json({ story });
+  }
+);
+
+router.delete(
+  "/:storyId",
+  requireAuth,
+  async (request: AuthenticatedRequest, response) => {
+    const storyId = String(request.params.storyId);
+    const existing = await prisma.storyItem.findFirst({
+      where: { id: storyId, userId: request.userId }
+    });
+
+    if (!existing) {
+      response.status(404).json({ message: "Story record not found" });
+      return;
+    }
+
+    await prisma.storyItem.delete({
+      where: { id: existing.id }
+    });
+
+    response.status(204).send();
+  }
+);
+
+export const storyRouter = router;

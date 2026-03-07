@@ -1,0 +1,20 @@
+{
+  "name": "hiremeplz",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "extension",
+    "worker"
+  ],
+  "scripts": {
+    "dev:frontend": "npm run dev --workspace frontend",
+    "dev:backend": "npm run dev --workspace backend",
+    "dev:worker": "npm run dev --workspace worker",
+    "build": "npm run build --workspace backend && npm run build --workspace frontend && npm run build --workspace extension && npm run build --workspace worker",
+    "lint": "npm run lint --workspace backend && npm run lint --workspace frontend && npm run lint --workspace extension && npm run lint --workspace worker",
+    "db:generate": "npm run db:generate --workspace backend",
+    "db:push": "npm run db:push --workspace backend"
+  }
+}

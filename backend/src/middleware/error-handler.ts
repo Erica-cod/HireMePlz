@@ -1,0 +1,16 @@
+import type { NextFunction, Request, Response } from "express";
+
+export function errorHandler(
+  error: unknown,
+  _request: Request,
+  response: Response,
+  _next: NextFunction
+) {
+  const message =
+    error instanceof Error ? error.message : "An unknown internal server error occurred";
+
+  response.status(500).json({
+    message,
+    error: process.env.NODE_ENV === "production" ? undefined : error
+  });
+}

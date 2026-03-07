@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HireMePlz Local Validation Form</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: #0f172a;
+        color: #e2e8f0;
+      }
+      .container {
+        max-width: 900px;
+        margin: 40px auto;
+        padding: 24px;
+        border: 1px solid #334155;
+        border-radius: 16px;
+        background: #111827;
+      }
+      h1 {
+        margin-top: 0;
+      }
+      .muted {
+        color: #94a3b8;
+      }
+      .grid {
+        display: grid;
+        gap: 14px;
+      }
+      label {
+        display: grid;
+        gap: 6px;
+        font-weight: 600;
+      }
+      input,
+      textarea,
+      select {
+        border: 1px solid #475569;
+        border-radius: 10px;
+        padding: 10px 12px;
+        background: #020617;
+        color: #e2e8f0;
+        font: inherit;
+      }
+      textarea {
+        min-height: 120px;
+      }
+      .row {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      }
+      button {
+        margin-top: 8px;
+        border: none;
+        border-radius: 10px;
+        padding: 10px 14px;
+        font-weight: 700;
+        background: #38bdf8;
+        color: #082f49;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="container">
+      <h1>Backend Developer Application</h1>
+      <p class="muted">
+        This is a mock application page used to validate the HireMePlz Chrome extension locally. Please fill profile data and story library in the Dashboard first.
+      </p>
+
+      <form class="grid">
+        <div class="row">
+          <label>
+            Full Name
+            <input id="full_name" name="full_name" placeholder="Your legal name" />
+          </label>
+          <label>
+            Email
+            <input id="email" name="email" type="email" placeholder="you@example.com" />
+          </label>
+        </div>
+
+        <div class="row">
+          <label>
+            Mobile Number
+            <input id="phone" name="phone" placeholder="+1 (xxx) xxx-xxxx" />
+          </label>
+          <label>
+            LinkedIn Profile
+            <input id="linkedin" name="linkedin" placeholder="https://linkedin.com/in/..." />
+          </label>
+        </div>
+
+        <div class="row">
+          <label>
+            School
+            <input id="school" name="school" placeholder="University name" />
+          </label>
+          <label>
+            Degree
+            <select id="degree" name="degree">
+              <option value="">Please choose</option>
+              <option value="BSc">BSc</option>
+              <option value="MEng">MEng</option>
+              <option value="MSc">MSc</option>
+              <option value="PhD">PhD</option>
+            </select>
+          </label>
+        </div>
+
+        <label>
+          Why do you want to join this company?
+          <textarea
+            id="why_company"
+            name="why_company"
+            placeholder="Tell us why this company and role is a fit for you"
+          ></textarea>
+        </label>
+
+        <label>
+          Describe a challenging project
+          <textarea
+            id="challenge_answer"
+            name="challenge_answer"
+            placeholder="Share a challenging project and your impact"
+          ></textarea>
+        </label>
+
+        <button type="button">Submit (Mock)</button>
+      </form>
+    </main>
+  </body>
+</html>

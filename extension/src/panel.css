@@ -1,0 +1,70 @@
+#hiremeplz-panel {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: 360px;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  z-index: 2147483647;
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+#hiremeplz-panel * {
+  box-sizing: border-box;
+}
+
+#hiremeplz-panel .panel-body {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+#hiremeplz-panel input,
+#hiremeplz-panel textarea {
+  width: 100%;
+  border: 1px solid #475569;
+  background: #020617;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+#hiremeplz-panel textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+#hiremeplz-panel button {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#hiremeplz-panel .primary {
+  background: #38bdf8;
+  color: #082f49;
+}
+
+#hiremeplz-panel .secondary {
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #475569;
+}
+
+#hiremeplz-panel .suggestion {
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+#hiremeplz-panel .muted {
+  color: #94a3b8;
+  font-size: 12px;
+}
