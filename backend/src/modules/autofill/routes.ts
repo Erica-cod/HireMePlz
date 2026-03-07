@@ -7,6 +7,7 @@ import {
   AuthenticatedRequest,
   requireAuth
 } from "../../middleware/auth.js";
+import { asyncHandler } from "../../middleware/async-handler.js";
 
 const router = Router();
 
@@ -31,10 +32,14 @@ const suggestionSchema = z.object({
 router.post(
   "/suggestions",
   requireAuth,
-  async (request: AuthenticatedRequest, response) => {
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
     const payload = suggestionSchema.parse(request.body);
 
-    const [profile, stories, experiences] = await Promise.all([
+    const [user, profile, stories, experiences] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: request.userId },
+        select: { email: true }
+      }),
       prisma.profile.findUnique({
         where: { userId: request.userId }
       }),
@@ -49,8 +54,10 @@ router.post(
     ]);
 
     const suggestions = await buildSuggestions({
+      userId: request.userId!,
       fields: payload.fields,
       profile,
+      userEmail: user?.email,
       stories,
       experiences,
       company: payload.company,
@@ -58,13 +65,13 @@ router.post(
     });
 
     response.json({ suggestions });
-  }
+  })
 );
 
 router.post(
   "/record",
   requireAuth,
-  async (request: AuthenticatedRequest, response) => {
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
     const payload = z
       .object({
         company: z.string().min(1),
@@ -96,7 +103,7 @@ router.post(
     });
 
     response.status(201).json({ application });
-  }
+  })
 );
 
 export const autofillRouter = router;

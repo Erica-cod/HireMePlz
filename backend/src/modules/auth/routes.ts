@@ -11,6 +11,7 @@ import {
   AuthenticatedRequest,
   requireAuth
 } from "../../middleware/auth.js";
+import { asyncHandler } from "../../middleware/async-handler.js";
 
 const router = Router();
 
@@ -19,7 +20,7 @@ const authSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters")
 });
 
-router.post("/register", async (request, response) => {
+router.post("/register", asyncHandler(async (request, response) => {
   const payload = authSchema.parse(request.body);
 
   const existingUser = await prisma.user.findUnique({
@@ -53,9 +54,9 @@ router.post("/register", async (request, response) => {
       profile: user.profile
     }
   });
-});
+}));
 
-router.post("/login", async (request, response) => {
+router.post("/login", asyncHandler(async (request, response) => {
   const payload = authSchema.parse(request.body);
 
   const user = await prisma.user.findUnique({
@@ -82,12 +83,12 @@ router.post("/login", async (request, response) => {
       profile: user.profile
     }
   });
-});
+}));
 
 router.get(
   "/me",
   requireAuth,
-  async (request: AuthenticatedRequest, response) => {
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
     const user = await prisma.user.findUnique({
       where: { id: request.userId },
       include: { profile: true }
@@ -105,7 +106,7 @@ router.get(
         profile: user.profile
       }
     });
-  }
+  })
 );
 
 export const authRouter = router;

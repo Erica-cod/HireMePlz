@@ -7,6 +7,7 @@ import {
   AuthenticatedRequest,
   requireAuth
 } from "../../middleware/auth.js";
+import { asyncHandler } from "../../middleware/async-handler.js";
 
 const router = Router();
 
@@ -23,7 +24,7 @@ const applicationSchema = z.object({
 router.get(
   "/",
   requireAuth,
-  async (request: AuthenticatedRequest, response) => {
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
     const applications = await prisma.application.findMany({
       where: { userId: request.userId },
       orderBy: { updatedAt: "desc" }
@@ -43,13 +44,13 @@ router.get(
     );
 
     response.json({ applications, stats });
-  }
+  })
 );
 
 router.post(
   "/",
   requireAuth,
-  async (request: AuthenticatedRequest, response) => {
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
     const payload = applicationSchema.parse(request.body);
 
     const application = await prisma.application.create({
@@ -66,13 +67,13 @@ router.post(
     });
 
     response.status(201).json({ application });
-  }
+  })
 );
 
 router.patch(
   "/:applicationId/status",
   requireAuth,
-  async (request: AuthenticatedRequest, response) => {
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
     const applicationId = String(request.params.applicationId);
     const payload = z
       .object({
@@ -95,7 +96,7 @@ router.patch(
     });
 
     response.json({ application });
-  }
+  })
 );
 
 export const applicationRouter = router;

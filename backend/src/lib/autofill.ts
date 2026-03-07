@@ -1,7 +1,9 @@
 import { OpenAI } from "openai";
+import { createHash } from "node:crypto";
 import type { Experience, Profile, StoryItem } from "@prisma/client";
 
 import { env } from "../config/env.js";
+import { prisma } from "./prisma.js";
 
 export type AutofillFieldInput = {
   id: string;
@@ -24,14 +26,31 @@ export type AutofillSuggestion = {
   reasoning: string;
 };
 
+type StructuredRuleKey =
+  | "fullName"
+  | "firstName"
+  | "lastName"
+  | "email"
+  | "phone"
+  | "location"
+  | "school"
+  | "degree"
+  | "linkedinUrl"
+  | "githubUrl"
+  | "portfolioUrl"
+  | "visaStatus";
+
 const openai = env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: env.OPENAI_API_KEY })
   : null;
 
 const structuredRules: Array<{
-  key: keyof Profile;
+  key: StructuredRuleKey;
   aliases: string[];
 }> = [
+  { key: "email", aliases: ["email", "e-mail", "email address"] },
+  { key: "firstName", aliases: ["first name", "given name", "fname"] },
+  { key: "lastName", aliases: ["last name", "surname", "family name", "lname"] },
   { key: "fullName", aliases: ["full name", "name", "legal name"] },
   { key: "phone", aliases: ["phone", "mobile", "contact number"] },
   { key: "location", aliases: ["location", "city", "address"] },
@@ -49,6 +68,18 @@ function normalizeText(...parts: Array<string | undefined>) {
     .join(" ")
     .trim()
     .toLowerCase();
+}
+
+function normalizeCacheKeyPart(value?: string) {
+  return value?.trim().toLowerCase().replace(/\s+/g, " ") || "";
+}
+
+function normalizeQuestionText(question: string) {
+  return question.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function buildQuestionHash(question: string) {
+  return createHash("sha256").update(normalizeQuestionText(question)).digest("hex");
 }
 
 function isOpenQuestion(field: AutofillFieldInput) {
@@ -69,12 +100,31 @@ function isOpenQuestion(field: AutofillFieldInput) {
   );
 }
 
-function getProfileValue(profile: Profile | null, key: keyof Profile) {
+function getStructuredValue(params: {
+  profile: Profile | null;
+  key: StructuredRuleKey;
+  userEmail?: string;
+}) {
+  const { key, profile, userEmail } = params;
+
+  if (key === "email") {
+    return userEmail || "";
+  }
+
+  if (key === "firstName") {
+    return profile?.fullName?.trim().split(/\s+/)[0] || "";
+  }
+
+  if (key === "lastName") {
+    const parts = profile?.fullName?.trim().split(/\s+/) || [];
+    return parts.length > 1 ? parts[parts.length - 1] : "";
+  }
+
   if (!profile) {
     return "";
   }
 
-  const value = profile[key];
+  const value = profile[key as keyof Profile];
   if (typeof value === "string") {
     return value;
   }
@@ -88,7 +138,8 @@ function getProfileValue(profile: Profile | null, key: keyof Profile) {
 
 export function scoreStructuredField(
   field: AutofillFieldInput,
-  profile: Profile | null
+  profile: Profile | null,
+  userEmail?: string
 ) {
   const normalized = normalizeText(
     field.label,
@@ -107,7 +158,7 @@ export function scoreStructuredField(
       }
     }
 
-    const value = getProfileValue(profile, rule.key);
+    const value = getStructuredValue({ profile, key: rule.key, userEmail });
     if (!value || score <= 0) {
       continue;
     }
@@ -217,20 +268,63 @@ async function buildOpenEndedAnswer(params: {
 }
 
 export async function buildSuggestions(params: {
+  userId: string;
   fields: AutofillFieldInput[];
   profile: Profile | null;
+  userEmail?: string;
   stories: StoryItem[];
   experiences: Experience[];
   company?: string;
   role?: string;
 }) {
-  const { company, experiences, fields, profile, role, stories } = params;
+  const { company, experiences, fields, profile, role, stories, userEmail, userId } = params;
   const suggestions: AutofillSuggestion[] = [];
 
   for (const field of fields) {
     if (isOpenQuestion(field)) {
       const question =
         field.label || field.placeholder || field.nearbyText || field.name || "";
+      const questionHash = buildQuestionHash(question);
+      const companyKey = normalizeCacheKeyPart(company);
+      const roleKey = normalizeCacheKeyPart(role);
+      const cachedAnswer = await prisma.answerMemory.findUnique({
+        where: {
+          userId_questionHash_companyKey_roleKey: {
+            userId,
+            questionHash,
+            companyKey,
+            roleKey
+          }
+        }
+      });
+
+      if (cachedAnswer?.answer) {
+        await prisma.answerMemory.update({
+          where: {
+            userId_questionHash_companyKey_roleKey: {
+              userId,
+              questionHash,
+              companyKey,
+              roleKey
+            }
+          },
+          data: {
+            hitCount: { increment: 1 },
+            lastUsedAt: new Date()
+          }
+        });
+
+        suggestions.push({
+          fieldId: field.id,
+          label: field.label || field.name || field.id,
+          kind: "open_ended",
+          confidence: 0.92,
+          value: cachedAnswer.answer,
+          reasoning: "Reused previously generated answer from answer memory cache"
+        });
+        continue;
+      }
+
       const story = pickRelevantStory(question, stories);
       const value = await buildOpenEndedAnswer({
         question,
@@ -238,6 +332,32 @@ export async function buildSuggestions(params: {
         role,
         story,
         experiences
+      });
+      await prisma.answerMemory.upsert({
+        where: {
+          userId_questionHash_companyKey_roleKey: {
+            userId,
+            questionHash,
+            companyKey,
+            roleKey
+          }
+        },
+        create: {
+          userId,
+          questionHash,
+          companyKey,
+          roleKey,
+          question,
+          answer: value,
+          hitCount: 1,
+          lastUsedAt: new Date()
+        },
+        update: {
+          question,
+          answer: value,
+          hitCount: { increment: 1 },
+          lastUsedAt: new Date()
+        }
       });
 
       suggestions.push({
@@ -253,7 +373,7 @@ export async function buildSuggestions(params: {
       continue;
     }
 
-    const structured = scoreStructuredField(field, profile);
+    const structured = scoreStructuredField(field, profile, userEmail);
     if (structured) {
       suggestions.push(structured);
     }

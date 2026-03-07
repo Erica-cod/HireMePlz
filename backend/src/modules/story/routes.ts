@@ -7,6 +7,7 @@ import {
   AuthenticatedRequest,
   requireAuth
 } from "../../middleware/auth.js";
+import { asyncHandler } from "../../middleware/async-handler.js";
 
 const router = Router();
 
@@ -23,20 +24,20 @@ const storySchema = z.object({
 router.get(
   "/",
   requireAuth,
-  async (request: AuthenticatedRequest, response) => {
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
     const stories = await prisma.storyItem.findMany({
       where: { userId: request.userId },
       orderBy: { updatedAt: "desc" }
     });
 
     response.json({ stories });
-  }
+  })
 );
 
 router.post(
   "/",
   requireAuth,
-  async (request: AuthenticatedRequest, response) => {
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
     const payload = storySchema.parse(request.body);
 
     const story = await prisma.storyItem.create({
@@ -47,13 +48,13 @@ router.post(
     });
 
     response.status(201).json({ story });
-  }
+  })
 );
 
 router.put(
   "/:storyId",
   requireAuth,
-  async (request: AuthenticatedRequest, response) => {
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
     const storyId = String(request.params.storyId);
     const payload = storySchema.parse(request.body);
     const existing = await prisma.storyItem.findFirst({
@@ -71,13 +72,13 @@ router.put(
     });
 
     response.json({ story });
-  }
+  })
 );
 
 router.delete(
   "/:storyId",
   requireAuth,
-  async (request: AuthenticatedRequest, response) => {
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
     const storyId = String(request.params.storyId);
     const existing = await prisma.storyItem.findFirst({
       where: { id: storyId, userId: request.userId }
@@ -93,7 +94,7 @@ router.delete(
     });
 
     response.status(204).send();
-  }
+  })
 );
 
 export const storyRouter = router;

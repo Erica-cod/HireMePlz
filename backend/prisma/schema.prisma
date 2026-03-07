@@ -48,6 +48,7 @@ model User {
   stories      StoryItem[]
   applications Application[]
   jobMatches   JobMatch[]
+  answerMemories AnswerMemory[]
 }
 
 model Profile {
@@ -162,4 +163,22 @@ model JobMatch {
   job        Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@unique([userId, jobId])
+}
+
+model AnswerMemory {
+  id           String   @id @default(cuid())
+  userId       String
+  questionHash String
+  companyKey   String
+  roleKey      String
+  question     String
+  answer       String
+  hitCount     Int      @default(0)
+  lastUsedAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionHash, companyKey, roleKey])
+  @@index([userId, updatedAt])
 }
