@@ -6,6 +6,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VENDOR_JOBSPY_PATH = REPO_ROOT / "vendor-jobspy"
