@@ -10,6 +10,28 @@ import { asyncHandler } from "../../middleware/async-handler.js";
 
 const router = Router();
 
+const optionalProfileUrlSchema = z.preprocess((value) => {
+  if (value === undefined || value === null) {
+    return value;
+  }
+
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const trimmed = value.trim();
+
+  if (trimmed === "") {
+    return "";
+  }
+
+  if (!/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(trimmed)) {
+    return `https://${trimmed}`;
+  }
+
+  return trimmed;
+}, z.string().url().optional().nullable().or(z.literal("")));
+
 const profileSchema = z.object({
   fullName: z.string().optional().nullable(),
   phone: z.string().optional().nullable(),
@@ -17,9 +39,9 @@ const profileSchema = z.object({
   school: z.string().optional().nullable(),
   degree: z.string().optional().nullable(),
   graduationYear: z.number().int().optional().nullable(),
-  linkedinUrl: z.string().url().optional().nullable().or(z.literal("")),
-  githubUrl: z.string().url().optional().nullable().or(z.literal("")),
-  portfolioUrl: z.string().url().optional().nullable().or(z.literal("")),
+  linkedinUrl: optionalProfileUrlSchema,
+  githubUrl: optionalProfileUrlSchema,
+  portfolioUrl: optionalProfileUrlSchema,
   visaStatus: z.string().optional().nullable(),
   preferredRoles: z.array(z.string()).default([]),
   preferredCities: z.array(z.string()).default([]),
