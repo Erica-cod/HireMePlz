@@ -35,7 +35,11 @@ router.post(
   asyncHandler(async (request: AuthenticatedRequest, response) => {
     const payload = suggestionSchema.parse(request.body);
 
-    const [profile, stories, experiences] = await Promise.all([
+    const [user, profile, stories, experiences] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: request.userId },
+        select: { email: true }
+      }),
       prisma.profile.findUnique({
         where: { userId: request.userId }
       }),
@@ -52,6 +56,7 @@ router.post(
     const suggestions = await buildSuggestions({
       fields: payload.fields,
       profile,
+      userEmail: user?.email,
       stories,
       experiences,
       company: payload.company,

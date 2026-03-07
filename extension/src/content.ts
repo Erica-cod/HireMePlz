@@ -2,7 +2,7 @@ import { collectPageFields, writeValue } from "./lib/detectors";
 import { matchFields, type MatchResult } from "./lib/matcher";
 
 // ============ MOCK MODE ============
-const MOCK_MODE = true;
+const MOCK_MODE = false;
 
 const MOCK_PROFILE: Record<string, unknown> = {
   first_name: "Keyin",
@@ -32,6 +32,19 @@ const MOCK_PROFILE: Record<string, unknown> = {
 // ===================================
 
 let matchResults: MatchResult[] = [];
+let autofillContext: { company: string; role: string } = {
+  company: "",
+  role: "",
+};
+
+type BackendSuggestion = {
+  fieldId: string;
+  label: string;
+  kind: "structured" | "open_ended";
+  confidence: number;
+  value: string;
+  reasoning: string;
+};
 
 function isApplicationPage(): boolean {
   const url = window.location.href.toLowerCase();
@@ -48,13 +61,14 @@ function isApplicationPage(): boolean {
 }
 
 async function init(): Promise<void> {
-  let profileData: Record<string, unknown>;
+  if (!MOCK_MODE && !isApplicationPage()) return;
+
+  const fields = collectPageFields();
+  if (fields.length === 0) return;
 
   if (MOCK_MODE) {
-    profileData = MOCK_PROFILE;
+    matchResults = matchFields(fields, MOCK_PROFILE);
   } else {
-    if (!isApplicationPage()) return;
-
     const apiUrl = await getStorageValue(
       "hiremeplz-api-url",
       "http://localhost:4000"
@@ -62,26 +76,15 @@ async function init(): Promise<void> {
     const token = await getStorageValue("hiremeplz-token");
     if (!token) return;
 
-    try {
-      const res = await fetch(`${apiUrl}/api/profile/full`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) return;
-      profileData = await res.json();
-    } catch {
-      return;
-    }
+    autofillContext = inferAutofillContext();
+    const suggestions = await requestSuggestions(fields, apiUrl, token);
+    matchResults = toMatchResults(fields, suggestions);
   }
 
-  const fields = collectPageFields();
-  if (fields.length === 0) return;
-
-  matchResults = matchFields(fields, profileData);
   if (matchResults.length === 0) return;
 
-  // Pre-fetch LLM answers for open-ended fields
-  const hasOpenEnded = matchResults.some((r) => r.source === "llm_pending");
-  if (hasOpenEnded) {
+  // In mock mode we still emulate delayed LLM completion.
+  if (MOCK_MODE && matchResults.some((r) => r.source === "llm_pending")) {
     await fetchLLMAnswers();
   }
 
@@ -94,6 +97,8 @@ async function getStorageValue(key: string, fallback = ""): Promise<string> {
 }
 
 function showFloatingButton(fieldCount: number): void {
+  document.getElementById("hiremeplz-fab")?.remove();
+
   const btn = document.createElement("div");
   btn.id = "hiremeplz-fab";
   btn.innerHTML = `
@@ -203,36 +208,7 @@ async function fetchLLMAnswers(): Promise<void> {
     return;
   }
 
-  const apiUrl = await getStorageValue(
-    "hiremeplz-api-url",
-    "http://localhost:4000"
-  );
-  const token = await getStorageValue("hiremeplz-token");
-  if (!token) return;
-
-  for (const field of openEndedFields) {
-    try {
-      const res = await fetch(`${apiUrl}/api/autofill/answer`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          question: field.label,
-          page_url: window.location.href,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        field.value = data.answer;
-        field.source = "llm";
-        field.confidence = data.confidence || 0.8;
-      }
-    } catch {
-      // Silently fail
-    }
-  }
+  // Non-mock mode gets open-ended suggestions from /api/autofill/suggestions.
 }
 
 async function fillAllFields(): Promise<void> {
@@ -257,6 +233,20 @@ async function fillAllFields(): Promise<void> {
     );
     const token = await getStorageValue("hiremeplz-token");
     if (token) {
+      const persistedSuggestions = matchResults
+        .filter((r) => r.value && r.source !== "none")
+        .map((r) => ({
+          fieldId: r.field_id,
+          label: r.label,
+          kind: r.type === "open_ended" ? "open_ended" : "structured",
+          confidence: r.confidence,
+          value: r.value || "",
+          reasoning:
+            r.source === "llm"
+              ? "Generated from story library and profile context"
+              : `Matched from profile key: ${r.profileKey || "unknown"}`,
+        }));
+
       await fetch(`${apiUrl}/api/autofill/record`, {
         method: "POST",
         headers: {
@@ -264,21 +254,141 @@ async function fillAllFields(): Promise<void> {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          company: document.title || "",
-          role: "",
+          company:
+            autofillContext.company ||
+            document.title ||
+            window.location.hostname,
+          role: autofillContext.role || document.title || "Unknown role",
           jobUrl: window.location.href,
-          suggestions: matchResults.map((r) => ({
-            fieldId: r.field_id,
-            label: r.label,
-            value: r.value,
-            source: r.source,
-          })),
+          suggestions: persistedSuggestions,
         }),
       });
     }
   } catch {
     // Don't block filling if tracking fails
   }
+}
+
+async function requestSuggestions(
+  fields: ReturnType<typeof collectPageFields>,
+  apiUrl: string,
+  token: string
+): Promise<BackendSuggestion[]> {
+  try {
+    const payload = {
+      company: autofillContext.company || undefined,
+      role: autofillContext.role || undefined,
+      fields: fields.map((field) => ({
+        id: field.id,
+        label: field.label,
+        name: field.name,
+        placeholder: field.placeholder,
+        tagName: field.tagName,
+        type: field.type,
+        options: field.options,
+        nearbyText: field.nearbyText,
+        required: field.required,
+      })),
+    };
+
+    const res = await fetch(`${apiUrl}/api/autofill/suggestions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) return [];
+    const data = (await res.json()) as { suggestions?: BackendSuggestion[] };
+    return data.suggestions ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function toMatchResults(
+  fields: ReturnType<typeof collectPageFields>,
+  suggestions: BackendSuggestion[]
+): MatchResult[] {
+  const fieldsById = new Map<
+    string,
+    Array<{ field: (typeof fields)[number]; index: number }>
+  >();
+  for (const [index, field] of fields.entries()) {
+    const queue = fieldsById.get(field.id) || [];
+    queue.push({ field, index });
+    fieldsById.set(field.id, queue);
+  }
+
+  const results: MatchResult[] = [];
+  const usedIndices = new Set<number>();
+
+  for (const suggestion of suggestions) {
+    const queue = fieldsById.get(suggestion.fieldId);
+    const entry = queue?.shift();
+    if (!entry) {
+      continue;
+    }
+    const { field, index } = entry;
+    usedIndices.add(index);
+
+    results.push({
+      field_id: field.id,
+      element: field.element,
+      type: suggestion.kind,
+      label: suggestion.label || field.label || field.name || field.id,
+      value: suggestion.value,
+      confidence: suggestion.confidence,
+      source: suggestion.kind === "open_ended" ? "llm" : "rule_match",
+    });
+  }
+
+  for (const [index, field] of fields.entries()) {
+    if (field.required && !usedIndices.has(index)) {
+      results.push({
+        field_id: field.id,
+        element: field.element,
+        type: "unmatched",
+        label: field.label || field.name || field.id,
+        value: null,
+        confidence: 0,
+        source: "none",
+      });
+    }
+  }
+
+  return results;
+}
+
+function inferAutofillContext(): { company: string; role: string } {
+  const title = document.title.trim();
+  const heading =
+    document.querySelector("h1")?.textContent?.replace(/\s+/g, " ").trim() || "";
+
+  let role = "";
+  let company = "";
+
+  const atMatch = heading.match(/(.+?)\s+at\s+(.+)/i) || title.match(/(.+?)\s+at\s+(.+)/i);
+  if (atMatch) {
+    role = atMatch[1]?.trim() || "";
+    company = atMatch[2]?.trim() || "";
+  }
+
+  if (!role) {
+    role = heading || title;
+  }
+
+  if (!company) {
+    const siteName = document
+      .querySelector('meta[property="og:site_name"]')
+      ?.getAttribute("content")
+      ?.trim();
+    company = siteName || window.location.hostname.replace(/^www\./, "");
+  }
+
+  return { company, role };
 }
 
 // Run on page load
