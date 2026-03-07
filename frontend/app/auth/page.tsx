@@ -32,7 +32,11 @@ export default function AuthPage() {
       window.localStorage.setItem("hiremeplz-token", data.token);
       window.location.href = "/dashboard";
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Sign-in failed");
+      if (error instanceof TypeError && error.message === "Failed to fetch") {
+        setMessage("Cannot connect to server. Please make sure the backend is running.");
+      } else {
+        setMessage(error instanceof Error ? error.message : "Sign-in failed");
+      }
     } finally {
       setLoading(false);
     }

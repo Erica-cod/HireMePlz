@@ -25,7 +25,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      <aside className="w-64 border-r bg-white min-h-screen p-4 flex flex-col">
+      <aside className="w-64 border-r bg-white h-screen sticky top-0 p-4 flex flex-col">
         <Link href="/" className="text-xl font-bold mb-8 block">
           HireMePlz
         </Link>
