@@ -1,16 +1,18 @@
-import "./globals.css";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: "HireMePlz",
-  description: "Intelligent job application autofill and tracking platform"
+  description: "Intelligent Job Application Autofill Platform",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className="min-h-screen bg-gray-50 text-gray-900">
+        {children}
+      </body>
     </html>
   );
 }

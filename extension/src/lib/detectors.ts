@@ -11,13 +11,10 @@ export type PageField = {
   element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 };
 
-function extractLabel(element: Element) {
+function getLabel(element: Element): string | undefined {
   const htmlElement = element as HTMLElement;
-  const ariaLabel = htmlElement.getAttribute("aria-label");
-  if (ariaLabel) {
-    return ariaLabel;
-  }
 
+  // 1. Explicit <label for="id">
   const id = htmlElement.getAttribute("id");
   if (id) {
     const label = document.querySelector(`label[for="${id}"]`);
@@ -26,31 +23,59 @@ function extractLabel(element: Element) {
     }
   }
 
-  const wrappedLabel = htmlElement.closest("label");
-  if (wrappedLabel?.textContent) {
-    return wrappedLabel.textContent.trim();
+  // 2. Parent <label>
+  const parentLabel = htmlElement.closest("label");
+  if (parentLabel) {
+    const text = parentLabel.textContent?.trim();
+    if (text) {
+      const inputText =
+        (htmlElement as HTMLInputElement).value ||
+        (htmlElement as HTMLInputElement).placeholder ||
+        "";
+      return text.replace(inputText, "").trim();
+    }
   }
 
-  return undefined;
+  // 3. Previous sibling text
+  const prev = htmlElement.previousElementSibling;
+  if (
+    prev &&
+    (prev.tagName === "LABEL" ||
+      prev.tagName === "SPAN" ||
+      prev.tagName === "P")
+  ) {
+    const text = prev.textContent?.trim();
+    if (text) return text;
+  }
+
+  // 4. aria-label
+  const ariaLabel = htmlElement.getAttribute("aria-label");
+  if (ariaLabel) {
+    return ariaLabel;
+  }
+
+  // 5. placeholder as last resort
+  return (htmlElement as HTMLInputElement).placeholder || undefined;
 }
 
-function extractNearbyText(element: Element) {
+function extractNearbyText(element: Element): string | undefined {
   const container = element.closest("div, section, article, fieldset");
   return container?.textContent?.replace(/\s+/g, " ").trim().slice(0, 240);
 }
 
-export function collectPageFields() {
-  const selectors = "input, textarea, select";
-  const elements = Array.from(document.querySelectorAll(selectors)).filter(
-    (element) => {
-      const htmlElement = element as HTMLInputElement;
-      return htmlElement.type !== "hidden" && !htmlElement.disabled;
-    }
-  ) as Array<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>;
+export function collectPageFields(): PageField[] {
+  const elements = Array.from(
+    document.querySelectorAll(
+      'input:not([type="hidden"]):not([type="submit"]):not([type="button"]), textarea, select'
+    )
+  ).filter((el) => {
+    const htmlEl = el as HTMLInputElement;
+    return !htmlEl.disabled;
+  }) as Array<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>;
 
   return elements.map<PageField>((element, index) => ({
     id: element.id || element.name || `field-${index + 1}`,
-    label: extractLabel(element),
+    label: getLabel(element),
     name: element.getAttribute("name") || undefined,
     placeholder: element.getAttribute("placeholder") || undefined,
     tagName: element.tagName,
@@ -62,16 +87,19 @@ export function collectPageFields() {
           )
         : undefined,
     nearbyText: extractNearbyText(element),
-    required: element.matches("[required]"),
-    element
+    required:
+      element.matches("[required]") ||
+      element.getAttribute("aria-required") === "true",
+    element,
   }));
 }
 
 export function writeValue(
   element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
   value: string
-) {
+): void {
   element.focus();
+
   if (element instanceof HTMLSelectElement) {
     const option = Array.from(element.options).find(
       (item) =>
@@ -82,9 +110,20 @@ export function writeValue(
       element.value = option.value;
     }
   } else {
-    element.value = value;
+    // Use native setter for React compatibility
+    const proto =
+      element.tagName === "TEXTAREA"
+        ? window.HTMLTextAreaElement.prototype
+        : window.HTMLInputElement.prototype;
+    const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+    if (setter) {
+      setter.call(element, value);
+    } else {
+      element.value = value;
+    }
   }
 
   element.dispatchEvent(new Event("input", { bubbles: true }));
   element.dispatchEvent(new Event("change", { bubbles: true }));
+  element.dispatchEvent(new Event("blur", { bubbles: true }));
 }
