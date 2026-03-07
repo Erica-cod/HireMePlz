@@ -6,6 +6,7 @@ import {
   AuthenticatedRequest,
   requireAuth
 } from "../../middleware/auth.js";
+import { asyncHandler } from "../../middleware/async-handler.js";
 
 const router = Router();
 
@@ -38,7 +39,7 @@ const educationSchema = z.object({
 router.get(
   "/",
   requireAuth,
-  async (request: AuthenticatedRequest, response) => {
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
     const [profile, educations] = await Promise.all([
       prisma.profile.findUnique({
         where: { userId: request.userId }
@@ -50,13 +51,13 @@ router.get(
     ]);
 
     response.json({ profile, educations });
-  }
+  })
 );
 
 router.put(
   "/",
   requireAuth,
-  async (request: AuthenticatedRequest, response) => {
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
     const payload = profileSchema.parse(request.body);
 
     const profile = await prisma.profile.upsert({
@@ -77,13 +78,13 @@ router.put(
     });
 
     response.json({ profile });
-  }
+  })
 );
 
 router.post(
   "/educations",
   requireAuth,
-  async (request: AuthenticatedRequest, response) => {
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
     const payload = educationSchema.parse(request.body);
 
     const education = await prisma.education.create({
@@ -99,13 +100,13 @@ router.post(
     });
 
     response.status(201).json({ education });
-  }
+  })
 );
 
 router.put(
   "/educations/:educationId",
   requireAuth,
-  async (request: AuthenticatedRequest, response) => {
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
     const educationId = String(request.params.educationId);
     const payload = educationSchema.parse(request.body);
     const existing = await prisma.education.findFirst({
@@ -130,13 +131,13 @@ router.put(
     });
 
     response.json({ education });
-  }
+  })
 );
 
 router.delete(
   "/educations/:educationId",
   requireAuth,
-  async (request: AuthenticatedRequest, response) => {
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
     const educationId = String(request.params.educationId);
     const existing = await prisma.education.findFirst({
       where: { id: educationId, userId: request.userId }
@@ -152,7 +153,7 @@ router.delete(
     });
 
     response.status(204).send();
-  }
+  })
 );
 
 export const profileRouter = router;
