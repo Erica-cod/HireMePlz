@@ -15,6 +15,7 @@ export default function JobsPage() {
 
 function JobsContent({ token }: { token: string }) {
   const [matches, setMatches] = useState<JobMatch[]>([]);
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -41,12 +42,23 @@ function JobsContent({ token }: { token: string }) {
         </div>
       ) : (
         <div className="space-y-4">
-          {matches.map((match) => (
+          {matches
+            .filter((m) => !dismissed.has(m.id))
+            .map((match) => (
             <div
               key={match.id}
-              className="rounded-xl border bg-white p-6 shadow-sm"
+              className="rounded-xl border bg-white p-6 shadow-sm relative"
             >
-              <div className="flex items-start justify-between">
+              <button
+                onClick={() =>
+                  setDismissed((prev) => new Set(prev).add(match.id))
+                }
+                className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-lg leading-none"
+                title="Dismiss"
+              >
+                &times;
+              </button>
+              <div className="flex items-start justify-between pr-6">
                 <div>
                   <h3 className="font-semibold">{match.job.title}</h3>
                   <p className="text-sm text-gray-600">

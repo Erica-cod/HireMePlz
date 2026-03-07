@@ -11,16 +11,32 @@ export type PageField = {
   element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 };
 
+function getLabelInRoot(
+  id: string,
+  root: Document | ShadowRoot
+): string | undefined {
+  const label = root.querySelector(`label[for="${id}"]`);
+  if (label?.textContent) return label.textContent.trim();
+
+  // Also search shadow roots
+  const allElements = root.querySelectorAll("*");
+  for (const el of Array.from(allElements)) {
+    if (el.shadowRoot) {
+      const found = getLabelInRoot(id, el.shadowRoot);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
 function getLabel(element: Element): string | undefined {
   const htmlElement = element as HTMLElement;
 
-  // 1. Explicit <label for="id">
+  // 1. Explicit <label for="id"> — search across shadow roots
   const id = htmlElement.getAttribute("id");
   if (id) {
-    const label = document.querySelector(`label[for="${id}"]`);
-    if (label?.textContent) {
-      return label.textContent.trim();
-    }
+    const found = getLabelInRoot(id, document);
+    if (found) return found;
   }
 
   // 2. Parent <label>
@@ -54,7 +70,13 @@ function getLabel(element: Element): string | undefined {
     return ariaLabel;
   }
 
-  // 5. placeholder as last resort
+  // 5. data-automation-id (Workday specific)
+  const automationId = htmlElement.getAttribute("data-automation-id");
+  if (automationId) {
+    return automationId.replace(/[-_]/g, " ");
+  }
+
+  // 6. placeholder as last resort
   return (htmlElement as HTMLInputElement).placeholder || undefined;
 }
 
@@ -63,12 +85,34 @@ function extractNearbyText(element: Element): string | undefined {
   return container?.textContent?.replace(/\s+/g, " ").trim().slice(0, 240);
 }
 
+const FIELD_SELECTOR =
+  'input:not([type="hidden"]):not([type="submit"]):not([type="button"]), textarea, select';
+
+function querySelectorAllDeep(
+  selector: string,
+  root: Document | ShadowRoot | Element = document
+): Element[] {
+  const results: Element[] = [];
+
+  // Query in the current root
+  const found =
+    "querySelectorAll" in root ? root.querySelectorAll(selector) : [];
+  results.push(...Array.from(found));
+
+  // Traverse children for shadow roots
+  const allElements =
+    "querySelectorAll" in root ? root.querySelectorAll("*") : [];
+  for (const el of Array.from(allElements)) {
+    if (el.shadowRoot) {
+      results.push(...querySelectorAllDeep(selector, el.shadowRoot));
+    }
+  }
+
+  return results;
+}
+
 export function collectPageFields(): PageField[] {
-  const elements = Array.from(
-    document.querySelectorAll(
-      'input:not([type="hidden"]):not([type="submit"]):not([type="button"]), textarea, select'
-    )
-  ).filter((el) => {
+  const elements = querySelectorAllDeep(FIELD_SELECTOR).filter((el) => {
     const htmlEl = el as HTMLInputElement;
     return !htmlEl.disabled;
   }) as Array<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>;

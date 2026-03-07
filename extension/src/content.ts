@@ -298,9 +298,17 @@ async function fillAllFields(): Promise<void> {
   }
 }
 
-// Run on page load
+// Run on page load, with retries for dynamically rendered pages (Workday etc.)
+async function initWithRetry(attempts = 5, delay = 1500): Promise<void> {
+  for (let i = 0; i < attempts; i++) {
+    await init();
+    if (matchResults.length > 0) return;
+    await new Promise((r) => setTimeout(r, delay));
+  }
+}
+
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => void init());
+  document.addEventListener("DOMContentLoaded", () => void initWithRetry());
 } else {
-  void init();
+  void initWithRetry();
 }
