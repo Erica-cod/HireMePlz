@@ -65,3 +65,16 @@ export type JobMatch = {
     applyUrl: string;
   };
 };
+
+export type AnswerMemory = {
+  id: string;
+  questionHash: string;
+  companyKey: string;
+  roleKey: string;
+  question: string;
+  answer: string;
+  hitCount: number;
+  lastUsedAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
