@@ -4,9 +4,9 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 
-import { AuthGate } from "../../../../components/auth-gate";
-import { apiRequest } from "../../../../lib/api";
-import type { AnswerMemory } from "../../../../types";
+import { AuthGate } from "../../../components/auth-gate";
+import { apiRequest } from "../../../lib/api";
+import type { AnswerMemory } from "../../../types";
 
 export default function AnswerMemoryPage() {
   return (
