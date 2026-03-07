@@ -31,14 +31,25 @@ export const FIELD_RULES: [RegExp, string][] = [
   [/company|employer|organization/i, "experience.company"],
   [/job.?title|position|role/i, "experience.title"],
 
-  // Authorization
+  // Authorization & Status
   [/authorized.?to.?work|work.?auth|legally.?auth/i, "work_authorization"],
-  [/sponsor|visa.?sponsor/i, "needs_sponsorship"],
+  [/sponsor|visa.?sponsor|require.?sponsor/i, "needs_sponsorship"],
+  [/citizen|permanent.?residen|immigration|status.?in.?canada|status.?in.?us|current.?status/i, "immigration_status"],
+  [/relocat|willing.?to.?relocat/i, "willing_to_relocate"],
+  [/remote|work.?remotely|open.?to.?remote/i, "open_to_remote"],
+  [/18.?years|age|over.?18|legally.?of.?age/i, "over_18"],
+  [/previously.?work|worked.?here|former.?employee/i, "previously_worked"],
+  [/background.?check|consent.?to.?background/i, "consent_background_check"],
+  [/drug.?test|drug.?screen/i, "consent_drug_test"],
+  [/non.?compete|non.?disclosure|nda/i, "no_noncompete"],
+  [/notice.?period|when.?can.?you.?start/i, "notice_period"],
+  [/hear.?about|how.?did.?you.?find|referral.?source/i, "referral_source"],
 
   // Other
-  [/salary|compensation|pay/i, "salary_expectation"],
-  [/start.?date|earliest.?start|available/i, "start_date"],
+  [/salary|compensation|pay|desired.?salary/i, "salary_expectation"],
+  [/start.?date|earliest.?start|available.?date/i, "start_date"],
   [/gender/i, "gender"],
+  [/pronoun/i, "pronouns"],
   [/veteran/i, "veteran_status"],
   [/disability|handicap/i, "disability_status"],
   [/race|ethnicity/i, "ethnicity"],
