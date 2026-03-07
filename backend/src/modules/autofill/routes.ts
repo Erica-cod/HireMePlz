@@ -54,6 +54,7 @@ router.post(
     ]);
 
     const suggestions = await buildSuggestions({
+      userId: request.userId!,
       fields: payload.fields,
       profile,
       userEmail: user?.email,

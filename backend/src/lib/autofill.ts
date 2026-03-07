@@ -1,7 +1,9 @@
 import { OpenAI } from "openai";
+import { createHash } from "node:crypto";
 import type { Experience, Profile, StoryItem } from "@prisma/client";
 
 import { env } from "../config/env.js";
+import { prisma } from "./prisma.js";
 
 export type AutofillFieldInput = {
   id: string;
@@ -66,6 +68,18 @@ function normalizeText(...parts: Array<string | undefined>) {
     .join(" ")
     .trim()
     .toLowerCase();
+}
+
+function normalizeCacheKeyPart(value?: string) {
+  return value?.trim().toLowerCase().replace(/\s+/g, " ") || "";
+}
+
+function normalizeQuestionText(question: string) {
+  return question.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function buildQuestionHash(question: string) {
+  return createHash("sha256").update(normalizeQuestionText(question)).digest("hex");
 }
 
 function isOpenQuestion(field: AutofillFieldInput) {
@@ -254,6 +268,7 @@ async function buildOpenEndedAnswer(params: {
 }
 
 export async function buildSuggestions(params: {
+  userId: string;
   fields: AutofillFieldInput[];
   profile: Profile | null;
   userEmail?: string;
@@ -262,13 +277,54 @@ export async function buildSuggestions(params: {
   company?: string;
   role?: string;
 }) {
-  const { company, experiences, fields, profile, role, stories, userEmail } = params;
+  const { company, experiences, fields, profile, role, stories, userEmail, userId } = params;
   const suggestions: AutofillSuggestion[] = [];
 
   for (const field of fields) {
     if (isOpenQuestion(field)) {
       const question =
         field.label || field.placeholder || field.nearbyText || field.name || "";
+      const questionHash = buildQuestionHash(question);
+      const companyKey = normalizeCacheKeyPart(company);
+      const roleKey = normalizeCacheKeyPart(role);
+      const cachedAnswer = await prisma.answerMemory.findUnique({
+        where: {
+          userId_questionHash_companyKey_roleKey: {
+            userId,
+            questionHash,
+            companyKey,
+            roleKey
+          }
+        }
+      });
+
+      if (cachedAnswer?.answer) {
+        await prisma.answerMemory.update({
+          where: {
+            userId_questionHash_companyKey_roleKey: {
+              userId,
+              questionHash,
+              companyKey,
+              roleKey
+            }
+          },
+          data: {
+            hitCount: { increment: 1 },
+            lastUsedAt: new Date()
+          }
+        });
+
+        suggestions.push({
+          fieldId: field.id,
+          label: field.label || field.name || field.id,
+          kind: "open_ended",
+          confidence: 0.92,
+          value: cachedAnswer.answer,
+          reasoning: "Reused previously generated answer from answer memory cache"
+        });
+        continue;
+      }
+
       const story = pickRelevantStory(question, stories);
       const value = await buildOpenEndedAnswer({
         question,
@@ -276,6 +332,32 @@ export async function buildSuggestions(params: {
         role,
         story,
         experiences
+      });
+      await prisma.answerMemory.upsert({
+        where: {
+          userId_questionHash_companyKey_roleKey: {
+            userId,
+            questionHash,
+            companyKey,
+            roleKey
+          }
+        },
+        create: {
+          userId,
+          questionHash,
+          companyKey,
+          roleKey,
+          question,
+          answer: value,
+          hitCount: 1,
+          lastUsedAt: new Date()
+        },
+        update: {
+          question,
+          answer: value,
+          hitCount: { increment: 1 },
+          lastUsedAt: new Date()
+        }
       });
 
       suggestions.push({
