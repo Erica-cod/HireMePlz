@@ -56,3 +56,139 @@ jobs:
 
       - name: Build all packages
         run: npm run build
+
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    needs:
+      - build-and-check
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && secrets.SWARM_HOST != '' && secrets.SWARM_USER != '' && secrets.SWARM_SSH_KEY != '' && secrets.DEPLOY_PATH != '' && secrets.DEPLOY_DOMAIN != '' && secrets.LETSENCRYPT_EMAIL != ''
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
+      IMAGE_TAG: ${{ github.sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.IMAGE_REGISTRY }}/hiremeplz-backend:${{ env.IMAGE_TAG }}
+            ${{ env.IMAGE_REGISTRY }}/hiremeplz-backend:latest
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://${{ secrets.DEPLOY_DOMAIN }}
+          tags: |
+            ${{ env.IMAGE_REGISTRY }}/hiremeplz-frontend:${{ env.IMAGE_TAG }}
+            ${{ env.IMAGE_REGISTRY }}/hiremeplz-frontend:latest
+
+      - name: Build and push worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./worker
+          push: true
+          tags: |
+            ${{ env.IMAGE_REGISTRY }}/hiremeplz-worker:${{ env.IMAGE_TAG }}
+            ${{ env.IMAGE_REGISTRY }}/hiremeplz-worker:latest
+
+      - name: Copy deploy files to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SWARM_HOST }}
+          username: ${{ secrets.SWARM_USER }}
+          key: ${{ secrets.SWARM_SSH_KEY }}
+          source: "deploy/*"
+          target: ${{ secrets.DEPLOY_PATH }}
+          strip_components: 0
+
+      - name: Deploy stack on Swarm manager
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          IMAGE_REGISTRY: ${{ env.IMAGE_REGISTRY }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+          DEPLOY_DOMAIN: ${{ secrets.DEPLOY_DOMAIN }}
+          LETSENCRYPT_EMAIL: ${{ secrets.LETSENCRYPT_EMAIL }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          JOB_ALERT_MIN_SCORE: ${{ secrets.JOB_ALERT_MIN_SCORE }}
+          SWARM_POSTGRES_PASSWORD: ${{ secrets.SWARM_POSTGRES_PASSWORD }}
+          SWARM_DATABASE_URL: ${{ secrets.SWARM_DATABASE_URL }}
+          SWARM_JWT_SECRET: ${{ secrets.SWARM_JWT_SECRET }}
+          SWARM_OPENAI_API_KEY: ${{ secrets.SWARM_OPENAI_API_KEY }}
+          SWARM_JSEARCH_API_KEY: ${{ secrets.SWARM_JSEARCH_API_KEY }}
+          SWARM_ADZUNA_APP_ID: ${{ secrets.SWARM_ADZUNA_APP_ID }}
+          SWARM_ADZUNA_APP_KEY: ${{ secrets.SWARM_ADZUNA_APP_KEY }}
+          SWARM_SENDGRID_API_KEY: ${{ secrets.SWARM_SENDGRID_API_KEY }}
+          SWARM_SENDGRID_FROM_EMAIL: ${{ secrets.SWARM_SENDGRID_FROM_EMAIL }}
+        with:
+          host: ${{ secrets.SWARM_HOST }}
+          username: ${{ secrets.SWARM_USER }}
+          key: ${{ secrets.SWARM_SSH_KEY }}
+          envs: DEPLOY_PATH,IMAGE_REGISTRY,IMAGE_TAG,DEPLOY_DOMAIN,LETSENCRYPT_EMAIL,OPENAI_MODEL,JOB_ALERT_MIN_SCORE,SWARM_POSTGRES_PASSWORD,SWARM_DATABASE_URL,SWARM_JWT_SECRET,SWARM_OPENAI_API_KEY,SWARM_JSEARCH_API_KEY,SWARM_ADZUNA_APP_ID,SWARM_ADZUNA_APP_KEY,SWARM_SENDGRID_API_KEY,SWARM_SENDGRID_FROM_EMAIL
+          script: |
+            set -eu
+            mkdir -p "${DEPLOY_PATH}/deploy"
+
+            if ! docker info >/dev/null 2>&1; then
+              echo "Docker is not available on remote host."
+              exit 1
+            fi
+
+            if ! docker info --format '{{.Swarm.LocalNodeState}}' | grep -q 'active'; then
+              docker swarm init
+            fi
+
+            ensure_secret() {
+              name="$1"
+              value="$2"
+              if [ -z "$value" ]; then
+                return 0
+              fi
+              if docker secret inspect "$name" >/dev/null 2>&1; then
+                return 0
+              fi
+              printf "%s" "$value" | docker secret create "$name" -
+            }
+
+            ensure_secret "postgres_password" "${SWARM_POSTGRES_PASSWORD}"
+            ensure_secret "database_url" "${SWARM_DATABASE_URL}"
+            ensure_secret "jwt_secret" "${SWARM_JWT_SECRET}"
+            ensure_secret "openai_api_key" "${SWARM_OPENAI_API_KEY}"
+            ensure_secret "jsearch_api_key" "${SWARM_JSEARCH_API_KEY}"
+            ensure_secret "adzuna_app_id" "${SWARM_ADZUNA_APP_ID}"
+            ensure_secret "adzuna_app_key" "${SWARM_ADZUNA_APP_KEY}"
+            ensure_secret "sendgrid_api_key" "${SWARM_SENDGRID_API_KEY}"
+            ensure_secret "sendgrid_from_email" "${SWARM_SENDGRID_FROM_EMAIL}"
+
+            cat > "${DEPLOY_PATH}/deploy/swarm.env" <<EOF
+            IMAGE_REGISTRY=${IMAGE_REGISTRY}
+            IMAGE_TAG=${IMAGE_TAG}
+            DOMAIN=${DEPLOY_DOMAIN}
+            LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
+            OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+            JOB_ALERT_MIN_SCORE=${JOB_ALERT_MIN_SCORE:-0.75}
+            EOF
+
+            cd "${DEPLOY_PATH}"
+            ./deploy/deploy-stack.sh ./deploy/swarm.env

@@ -1,50 +1,117 @@
 version: "3.9"
 
 services:
+  reverse-proxy:
+    image: traefik:v3.2
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.swarmMode=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=hiremeplz_edge"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.le.acme.email=${LETSENCRYPT_EMAIL}"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.le.acme.httpchallenge=true"
+      - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_letsencrypt:/letsencrypt
+    networks:
+      - edge
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
   postgres:
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: hiremeplz
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    secrets:
+      - postgres_password
+    networks:
+      - internal
     deploy:
       placement:
         constraints:
           - node.role == manager
+      restart_policy:
+        condition: on-failure
 
   backend:
-    image: your-dockerhub-username/hiremeplz-backend:latest
+    image: ${IMAGE_REGISTRY}/hiremeplz-backend:${IMAGE_TAG}
     environment:
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/hiremeplz?schema=public
-      JWT_SECRET: ${JWT_SECRET}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      DATABASE_URL_FILE: /run/secrets/database_url
+      JWT_SECRET_FILE: /run/secrets/jwt_secret
+      OPENAI_API_KEY_FILE: /run/secrets/openai_api_key
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       PORT: 4000
-    ports:
-      - "4000:4000"
+    secrets:
+      - database_url
+      - jwt_secret
+      - openai_api_key
+    networks:
+      - edge
+      - internal
     deploy:
       replicas: 2
       restart_policy:
         condition: on-failure
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.hiremeplz-api.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`)"
+        - "traefik.http.routers.hiremeplz-api.entrypoints=websecure"
+        - "traefik.http.routers.hiremeplz-api.tls=true"
+        - "traefik.http.routers.hiremeplz-api.tls.certresolver=le"
+        - "traefik.http.services.hiremeplz-api.loadbalancer.server.port=4000"
+        - "traefik.http.routers.hiremeplz-api.priority=100"
 
   frontend:
-    image: your-dockerhub-username/hiremeplz-frontend:latest
-    ports:
-      - "3000:3000"
+    image: ${IMAGE_REGISTRY}/hiremeplz-frontend:${IMAGE_TAG}
+    networks:
+      - edge
     deploy:
       replicas: 2
       restart_policy:
         condition: on-failure
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.hiremeplz-web.rule=Host(`${DOMAIN}`)"
+        - "traefik.http.routers.hiremeplz-web.entrypoints=websecure"
+        - "traefik.http.routers.hiremeplz-web.tls=true"
+        - "traefik.http.routers.hiremeplz-web.tls.certresolver=le"
+        - "traefik.http.services.hiremeplz-web.loadbalancer.server.port=3000"
+        - "traefik.http.routers.hiremeplz-web.priority=10"
 
   worker:
-    image: your-dockerhub-username/hiremeplz-worker:latest
+    image: ${IMAGE_REGISTRY}/hiremeplz-worker:${IMAGE_TAG}
     environment:
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/hiremeplz?schema=public
-      JSEARCH_API_KEY: ${JSEARCH_API_KEY}
-      ADZUNA_APP_ID: ${ADZUNA_APP_ID}
-      ADZUNA_APP_KEY: ${ADZUNA_APP_KEY}
+      DATABASE_URL_FILE: /run/secrets/database_url
+      JSEARCH_API_KEY_FILE: /run/secrets/jsearch_api_key
+      ADZUNA_APP_ID_FILE: /run/secrets/adzuna_app_id
+      ADZUNA_APP_KEY_FILE: /run/secrets/adzuna_app_key
+      SENDGRID_API_KEY_FILE: /run/secrets/sendgrid_api_key
+      SENDGRID_FROM_EMAIL_FILE: /run/secrets/sendgrid_from_email
+      JOB_ALERT_MIN_SCORE: ${JOB_ALERT_MIN_SCORE:-0.75}
+    secrets:
+      - database_url
+      - jsearch_api_key
+      - adzuna_app_id
+      - adzuna_app_key
+      - sendgrid_api_key
+      - sendgrid_from_email
+    networks:
+      - internal
     deploy:
       replicas: 1
       restart_policy:
@@ -52,3 +119,30 @@ services:
 
 volumes:
   postgres_data:
+  traefik_letsencrypt:
+
+networks:
+  edge:
+    driver: overlay
+  internal:
+    driver: overlay
+
+secrets:
+  postgres_password:
+    external: true
+  database_url:
+    external: true
+  jwt_secret:
+    external: true
+  openai_api_key:
+    external: true
+  jsearch_api_key:
+    external: true
+  adzuna_app_id:
+    external: true
+  adzuna_app_key:
+    external: true
+  sendgrid_api_key:
+    external: true
+  sendgrid_from_email:
+    external: true

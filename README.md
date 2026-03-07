@@ -61,6 +61,18 @@ npm run build --workspace extension
 docker compose up --build
 ```
 
+## Production (Swarm + HTTPS)
+
+生产部署支持 Docker Swarm + Traefik HTTPS 反向代理，并使用 Docker secrets 管理敏感配置。
+
+- 栈配置：`deploy/swarm-stack.yml`
+- 部署变量示例：`deploy/swarm.env.example`
+- Secrets 引导脚本：`deploy/bootstrap-secrets.sh`
+- 部署脚本：`deploy/deploy-stack.sh`
+- 详细说明：`docs/deployment.md`
+
+GitHub Actions 已包含自动部署阶段（push 到 `main`/`master` 时触发）。
+
 ## 模块说明
 
 - `backend` 暴露认证、资料管理、故事库、申请记录、智能建议和岗位推荐 API

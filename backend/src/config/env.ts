@@ -1,8 +1,27 @@
 import { config } from "dotenv";
+import { readFileSync } from "node:fs";
 import { z } from "zod";
 
 config({ path: "../.env" });
 config();
+
+function readSecret(name: string) {
+  const direct = process.env[name];
+  if (direct && direct.trim()) {
+    return direct.trim();
+  }
+
+  const filePath = process.env[`${name}_FILE`];
+  if (!filePath) {
+    return "";
+  }
+
+  try {
+    return readFileSync(filePath, "utf8").trim();
+  } catch {
+    return "";
+  }
+}
 
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
@@ -12,4 +31,11 @@ const envSchema = z.object({
   PORT: z.coerce.number().default(4000)
 });
 
-export const env = envSchema.parse(process.env);
+export const env = envSchema.parse({
+  ...process.env,
+  DATABASE_URL: readSecret("DATABASE_URL"),
+  JWT_SECRET: readSecret("JWT_SECRET"),
+  OPENAI_API_KEY: readSecret("OPENAI_API_KEY"),
+  OPENAI_MODEL: process.env.OPENAI_MODEL,
+  PORT: process.env.PORT
+});
