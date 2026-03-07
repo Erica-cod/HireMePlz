@@ -18,6 +18,8 @@ function AnswerMemoryContent({ token }: { token: string }) {
   const [memories, setMemories] = useState<AnswerMemory[]>([]);
   const [search, setSearch] = useState("");
   const [message, setMessage] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftAnswer, setDraftAnswer] = useState("");
 
   function loadData(nextSearch = search) {
     const params = new URLSearchParams();
@@ -51,6 +53,42 @@ function AnswerMemoryContent({ token }: { token: string }) {
       setMessage("Cached answer deleted");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Delete failed");
+    }
+  }
+
+  function startEdit(memory: AnswerMemory) {
+    setEditingId(memory.id);
+    setDraftAnswer(memory.answer);
+    setMessage("");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setDraftAnswer("");
+  }
+
+  async function handleSave(memoryId: string) {
+    if (!draftAnswer.trim()) {
+      setMessage("Answer cannot be empty");
+      return;
+    }
+
+    try {
+      const data = await apiRequest<{ memory: AnswerMemory }>(
+        `/answer-memory/${memoryId}`,
+        {
+          method: "PUT",
+          token,
+          body: { answer: draftAnswer.trim() }
+        }
+      );
+      setMemories((current) =>
+        current.map((item) => (item.id === memoryId ? data.memory : item))
+      );
+      setMessage("Cached answer updated");
+      cancelEdit();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Save failed");
     }
   }
 
@@ -111,17 +149,50 @@ function AnswerMemoryContent({ token }: { token: string }) {
                   Last used: {new Date(memory.lastUsedAt).toLocaleString()} · Hits:{" "}
                   {memory.hitCount}
                 </p>
-                <button
-                  onClick={() => handleDelete(memory.id)}
-                  className="text-sm text-red-600 hover:underline"
-                >
-                  Delete
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => startEdit(memory)}
+                    className="text-sm text-blue-600 hover:underline"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(memory.id)}
+                    className="text-sm text-red-600 hover:underline"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
               <p className="mb-2 text-sm font-medium text-gray-900">{memory.question}</p>
-              <p className="mb-2 whitespace-pre-wrap text-sm text-gray-700">
-                {memory.answer}
-              </p>
+              {editingId === memory.id ? (
+                <div className="mb-2">
+                  <textarea
+                    value={draftAnswer}
+                    onChange={(event) => setDraftAnswer(event.target.value)}
+                    rows={6}
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                  />
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={() => handleSave(memory.id)}
+                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={cancelEdit}
+                      className="rounded-lg border px-3 py-1.5 text-sm hover:bg-gray-100"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="mb-2 whitespace-pre-wrap text-sm text-gray-700">
+                  {memory.answer}
+                </p>
+              )}
               <p className="text-xs text-gray-500">
                 Context: role="{memory.roleKey || "any"}" · company="
                 {memory.companyKey || "any"}"

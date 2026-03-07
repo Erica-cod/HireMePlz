@@ -15,6 +15,10 @@ const querySchema = z.object({
   search: z.string().trim().optional()
 });
 
+const updateSchema = z.object({
+  answer: z.string().trim().min(1)
+});
+
 router.get(
   "/",
   requireAuth,
@@ -38,6 +42,37 @@ router.get(
     });
 
     response.json({ memories });
+  })
+);
+
+router.put(
+  "/:memoryId",
+  requireAuth,
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
+    const memoryId = String(request.params.memoryId);
+    const payload = updateSchema.parse(request.body);
+
+    const existing = await prisma.answerMemory.findFirst({
+      where: {
+        id: memoryId,
+        userId: request.userId
+      }
+    });
+
+    if (!existing) {
+      response.status(404).json({ message: "Answer memory not found" });
+      return;
+    }
+
+    const memory = await prisma.answerMemory.update({
+      where: { id: existing.id },
+      data: {
+        answer: payload.answer,
+        lastUsedAt: new Date()
+      }
+    });
+
+    response.json({ memory });
   })
 );
 
