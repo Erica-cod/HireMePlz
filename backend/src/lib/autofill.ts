@@ -24,14 +24,31 @@ export type AutofillSuggestion = {
   reasoning: string;
 };
 
+type StructuredRuleKey =
+  | "fullName"
+  | "firstName"
+  | "lastName"
+  | "email"
+  | "phone"
+  | "location"
+  | "school"
+  | "degree"
+  | "linkedinUrl"
+  | "githubUrl"
+  | "portfolioUrl"
+  | "visaStatus";
+
 const openai = env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: env.OPENAI_API_KEY })
   : null;
 
 const structuredRules: Array<{
-  key: keyof Profile;
+  key: StructuredRuleKey;
   aliases: string[];
 }> = [
+  { key: "email", aliases: ["email", "e-mail", "email address"] },
+  { key: "firstName", aliases: ["first name", "given name", "fname"] },
+  { key: "lastName", aliases: ["last name", "surname", "family name", "lname"] },
   { key: "fullName", aliases: ["full name", "name", "legal name"] },
   { key: "phone", aliases: ["phone", "mobile", "contact number"] },
   { key: "location", aliases: ["location", "city", "address"] },
@@ -69,12 +86,31 @@ function isOpenQuestion(field: AutofillFieldInput) {
   );
 }
 
-function getProfileValue(profile: Profile | null, key: keyof Profile) {
+function getStructuredValue(params: {
+  profile: Profile | null;
+  key: StructuredRuleKey;
+  userEmail?: string;
+}) {
+  const { key, profile, userEmail } = params;
+
+  if (key === "email") {
+    return userEmail || "";
+  }
+
+  if (key === "firstName") {
+    return profile?.fullName?.trim().split(/\s+/)[0] || "";
+  }
+
+  if (key === "lastName") {
+    const parts = profile?.fullName?.trim().split(/\s+/) || [];
+    return parts.length > 1 ? parts[parts.length - 1] : "";
+  }
+
   if (!profile) {
     return "";
   }
 
-  const value = profile[key];
+  const value = profile[key as keyof Profile];
   if (typeof value === "string") {
     return value;
   }
@@ -88,7 +124,8 @@ function getProfileValue(profile: Profile | null, key: keyof Profile) {
 
 export function scoreStructuredField(
   field: AutofillFieldInput,
-  profile: Profile | null
+  profile: Profile | null,
+  userEmail?: string
 ) {
   const normalized = normalizeText(
     field.label,
@@ -107,7 +144,7 @@ export function scoreStructuredField(
       }
     }
 
-    const value = getProfileValue(profile, rule.key);
+    const value = getStructuredValue({ profile, key: rule.key, userEmail });
     if (!value || score <= 0) {
       continue;
     }
@@ -219,12 +256,13 @@ async function buildOpenEndedAnswer(params: {
 export async function buildSuggestions(params: {
   fields: AutofillFieldInput[];
   profile: Profile | null;
+  userEmail?: string;
   stories: StoryItem[];
   experiences: Experience[];
   company?: string;
   role?: string;
 }) {
-  const { company, experiences, fields, profile, role, stories } = params;
+  const { company, experiences, fields, profile, role, stories, userEmail } = params;
   const suggestions: AutofillSuggestion[] = [];
 
   for (const field of fields) {
@@ -253,7 +291,7 @@ export async function buildSuggestions(params: {
       continue;
     }
 
-    const structured = scoreStructuredField(field, profile);
+    const structured = scoreStructuredField(field, profile, userEmail);
     if (structured) {
       suggestions.push(structured);
     }
