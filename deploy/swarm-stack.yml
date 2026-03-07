@@ -140,10 +140,30 @@ services:
   alertmanager:
     image: prom/alertmanager:v0.27.0
     command:
-      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - /bin/sh
+      - -c
+      - |
+        if [ -f /run/secrets/alert_email_password ]; then
+          export ALERT_EMAIL_PASSWORD="$(cat /run/secrets/alert_email_password)";
+        fi
+        if [ -f /run/secrets/alert_slack_webhook ]; then
+          export ALERT_SLACK_WEBHOOK="$(cat /run/secrets/alert_slack_webhook)";
+        fi
+        exec /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml --config.expand-env
+    environment:
+      ALERT_EMAIL_SMARTHOST: ${ALERT_EMAIL_SMARTHOST:-smtp.sendgrid.net:587}
+      ALERT_EMAIL_FROM: ${ALERT_EMAIL_FROM:-alerts@hiremeplz.local}
+      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-alerts@hiremeplz.local}
+      ALERT_EMAIL_AUTH_USERNAME: ${ALERT_EMAIL_AUTH_USERNAME:-apikey}
+      ALERT_EMAIL_PASSWORD: placeholder
+      ALERT_SLACK_CHANNEL: ${ALERT_SLACK_CHANNEL:-#hiremeplz-alerts}
+      ALERT_SLACK_WEBHOOK: https://hooks.slack.com/services/T000/B000/PLACEHOLDER
     volumes:
       - ./deploy/monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - alertmanager_data:/alertmanager
+    secrets:
+      - alert_email_password
+      - alert_slack_webhook
     networks:
       - internal
     deploy:
@@ -245,4 +265,8 @@ secrets:
   sendgrid_from_email:
     external: true
   grafana_admin_password:
+    external: true
+  alert_email_password:
+    external: true
+  alert_slack_webhook:
     external: true

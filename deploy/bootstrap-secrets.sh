@@ -15,6 +15,8 @@ set -eu
 # SENDGRID_API_KEY
 # SENDGRID_FROM_EMAIL
 # GRAFANA_ADMIN_PASSWORD
+# ALERT_EMAIL_PASSWORD
+# ALERT_SLACK_WEBHOOK
 
 SECRETS_FILE="${1:-./deploy/secrets.env}"
 
@@ -54,5 +56,7 @@ ensure_secret "adzuna_app_key" "${ADZUNA_APP_KEY:-}"
 ensure_secret "sendgrid_api_key" "${SENDGRID_API_KEY:-}"
 ensure_secret "sendgrid_from_email" "${SENDGRID_FROM_EMAIL:-}"
 ensure_secret "grafana_admin_password" "${GRAFANA_ADMIN_PASSWORD:-}"
+ensure_secret "alert_email_password" "${ALERT_EMAIL_PASSWORD:-changeme}"
+ensure_secret "alert_slack_webhook" "${ALERT_SLACK_WEBHOOK:-https://hooks.slack.com/services/T000/B000/PLACEHOLDER}"
 
 echo "Secret bootstrap complete."

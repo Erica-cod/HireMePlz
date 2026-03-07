@@ -74,6 +74,15 @@ services:
     restart: unless-stopped
     command:
       - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--config.expand-env"
+    environment:
+      ALERT_EMAIL_SMARTHOST: ${ALERT_EMAIL_SMARTHOST:-smtp.sendgrid.net:587}
+      ALERT_EMAIL_FROM: ${ALERT_EMAIL_FROM:-alerts@hiremeplz.local}
+      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-alerts@hiremeplz.local}
+      ALERT_EMAIL_AUTH_USERNAME: ${ALERT_EMAIL_AUTH_USERNAME:-apikey}
+      ALERT_EMAIL_PASSWORD: ${ALERT_EMAIL_PASSWORD:-changeme}
+      ALERT_SLACK_CHANNEL: ${ALERT_SLACK_CHANNEL:-#hiremeplz-alerts}
+      ALERT_SLACK_WEBHOOK: ${ALERT_SLACK_WEBHOOK:-https://hooks.slack.com/services/T000/B000/PLACEHOLDER}
     volumes:
       - ./deploy/monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - alertmanager_data:/alertmanager

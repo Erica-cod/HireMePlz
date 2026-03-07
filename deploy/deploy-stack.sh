@@ -26,6 +26,11 @@ export MONITORING_DOMAIN="${MONITORING_DOMAIN:-monitor.${DOMAIN}}"
 export OPENAI_MODEL="${OPENAI_MODEL:-gpt-4o-mini}"
 export JOB_ALERT_MIN_SCORE="${JOB_ALERT_MIN_SCORE:-0.75}"
 export GRAFANA_ADMIN_USER="${GRAFANA_ADMIN_USER:-admin}"
+export ALERT_EMAIL_SMARTHOST="${ALERT_EMAIL_SMARTHOST:-smtp.sendgrid.net:587}"
+export ALERT_EMAIL_FROM="${ALERT_EMAIL_FROM:-alerts@hiremeplz.local}"
+export ALERT_EMAIL_TO="${ALERT_EMAIL_TO:-alerts@hiremeplz.local}"
+export ALERT_EMAIL_AUTH_USERNAME="${ALERT_EMAIL_AUTH_USERNAME:-apikey}"
+export ALERT_SLACK_CHANNEL="${ALERT_SLACK_CHANNEL:-#hiremeplz-alerts}"
 
 docker stack deploy \
   -c deploy/swarm-stack.yml \

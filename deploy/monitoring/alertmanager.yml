@@ -1,8 +1,12 @@
 global:
   resolve_timeout: 5m
+  smtp_smarthost: ${ALERT_EMAIL_SMARTHOST}
+  smtp_from: ${ALERT_EMAIL_FROM}
+  smtp_auth_username: ${ALERT_EMAIL_AUTH_USERNAME}
+  smtp_require_tls: true
 
 route:
-  receiver: default
+  receiver: default-notifications
   group_by:
     - alertname
     - severity
@@ -11,4 +15,20 @@ route:
   repeat_interval: 2h
 
 receivers:
-  - name: default
+  - name: default-notifications
+    email_configs:
+      - to: ${ALERT_EMAIL_TO}
+        auth_password: ${ALERT_EMAIL_PASSWORD}
+        send_resolved: true
+        headers:
+          subject: "[{{ .Status | toUpper }}] HireMePlz Alert: {{ .CommonLabels.alertname }}"
+    slack_configs:
+      - api_url: ${ALERT_SLACK_WEBHOOK}
+        channel: ${ALERT_SLACK_CHANNEL}
+        send_resolved: true
+        title: "[{{ .Status | toUpper }}] HireMePlz Alert"
+        text: >-
+          {{ range .Alerts }}
+          *{{ .Annotations.summary }}*
+          {{ .Annotations.description }}
+          {{ end }}

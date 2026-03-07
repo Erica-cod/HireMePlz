@@ -98,6 +98,7 @@ Monitoring is now implemented in this repository with Prometheus + Grafana + exp
 - cAdvisor (`gcr.io/cadvisor/cadvisor`) for container metrics
 - node-exporter (`prom/node-exporter`) for host metrics
 - Backend application metrics endpoint at `/metrics`
+- Alertmanager email + Slack receivers for push alerts
 
 ### Metrics and Alerts
 
@@ -128,6 +129,28 @@ Grafana will be exposed at:
 
 Prometheus and Alertmanager stay internal by default.
 
+### Alert Notifications (Email + Slack)
+
+Alertmanager now supports automatic push notifications to email and Slack.
+
+Non-secret values in `deploy/swarm.env`:
+
+- `ALERT_EMAIL_SMARTHOST` (default `smtp.sendgrid.net:587`)
+- `ALERT_EMAIL_FROM`
+- `ALERT_EMAIL_TO`
+- `ALERT_EMAIL_AUTH_USERNAME` (for SendGrid SMTP use `apikey`)
+- `ALERT_SLACK_CHANNEL` (e.g. `#hiremeplz-alerts`)
+
+Secrets (created via `deploy/bootstrap-secrets.sh`):
+
+- `alert_email_password` from `ALERT_EMAIL_PASSWORD`
+- `alert_slack_webhook` from `ALERT_SLACK_WEBHOOK`
+
+Local Docker Compose also supports these via `.env` using:
+
+- `ALERT_EMAIL_*`
+- `ALERT_SLACK_*`
+
 ## GitHub Actions CD (Auto Deploy)
 
 `/.github/workflows/ci.yml` now includes a deploy job on push to `main`/`master`.
@@ -144,6 +167,11 @@ Required repository secrets:
 - `OPENAI_MODEL` (optional; defaults to `gpt-4o-mini`)
 - `JOB_ALERT_MIN_SCORE` (optional; defaults to `0.75`)
 - `GRAFANA_ADMIN_USER` (optional; defaults to `admin`)
+- `ALERT_EMAIL_SMARTHOST` (optional; defaults to `smtp.sendgrid.net:587`)
+- `ALERT_EMAIL_FROM` (optional)
+- `ALERT_EMAIL_TO` (optional)
+- `ALERT_EMAIL_AUTH_USERNAME` (optional; defaults to `apikey`)
+- `ALERT_SLACK_CHANNEL` (optional; defaults to `#hiremeplz-alerts`)
 - `SWARM_POSTGRES_PASSWORD`
 - `SWARM_DATABASE_URL`
 - `SWARM_JWT_SECRET`
@@ -154,5 +182,7 @@ Required repository secrets:
 - `SWARM_SENDGRID_API_KEY`
 - `SWARM_SENDGRID_FROM_EMAIL`
 - `SWARM_GRAFANA_ADMIN_PASSWORD`
+- `SWARM_ALERT_EMAIL_PASSWORD`
+- `SWARM_ALERT_SLACK_WEBHOOK`
 
 The workflow builds/pushes backend/frontend/worker images to GHCR, ensures required Docker secrets exist on the Swarm manager, then deploys `deploy/swarm-stack.yml`.
