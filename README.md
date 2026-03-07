@@ -1,5 +1,8 @@
 # HireMePlz
 
+
+![Hire Me Please!](https://media1.tenor.com/m/JqxVqlU-M0IAAAAd/%D1%82%D0%BE%D0%BC-%D0%B8.gif)
+
 HireMePlz is a project that helps job seekers centrally manage their data, intelligently fill application forms, track application history, and get job recommendations. This repository currently implements four core subprojects with an MVP-first scope:
 
 - `frontend`: Next.js web dashboard
@@ -8,6 +11,8 @@ HireMePlz is a project that helps job seekers centrally manage their data, intel
 - `worker`: background job fetching and matching tasks
 
 ## MVP Scope
+
+![😁](https://media1.tenor.com/m/tn4LOK2uvroAAAAC/tom-and.gif)
 
 The current priority is to ensure this end-to-end flow works:
 
