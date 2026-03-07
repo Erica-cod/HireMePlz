@@ -1,5 +1,7 @@
 # HireMePlz
 
+![Hire Me Please!](https://media1.tenor.com/m/JqxVqlU-M0IAAAAd/%D1%82%D0%BE%D0%BC-%D0%B8.gif)
+
 HireMePlz 是一个帮助求职者集中管理资料、智能填写申请表、记录申请历史并推荐岗位的项目。当前仓库按照 MVP 优先原则实现了四个核心子项目：
 
 - `frontend`：Next.js Web 控制台
