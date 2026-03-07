@@ -1,24 +1,28 @@
 import { prisma } from "./lib/prisma.js";
-import { seedJobsAndMatches } from "./jobs/fetchJobs.js";
+import { workerEnv } from "./lib/env.js";
+import { processDueJobSubscriptions } from "./jobs/fetchJobs.js";
 
-const POLL_INTERVAL_MS = 10 * 60 * 1000;
+const POLL_INTERVAL_MS = workerEnv.workerPollIntervalMs;
 
 async function runOnce() {
-  await seedJobsAndMatches();
-  console.log("HireMePlz worker completed one round of job fetching and matching.");
+  const summary = await processDueJobSubscriptions();
+  console.log(
+    `[worker] Completed polling round: processed=${summary.processedSubscriptions}, success=${summary.successCount}, failed=${summary.failureCount}`
+  );
 }
 
 async function main() {
+  console.log(`[worker] Starting job ingestion worker. pollIntervalMs=${POLL_INTERVAL_MS}`);
   await runOnce();
   setInterval(() => {
     void runOnce().catch((error) => {
-      console.error("Worker scheduled task failed", error);
+      console.error("[worker] Scheduled task failed", error);
     });
   }, POLL_INTERVAL_MS);
 }
 
 void main().catch(async (error) => {
-  console.error("Worker startup failed", error);
+  console.error("[worker] Startup failed", error);
   await prisma.$disconnect();
   process.exit(1);
 });
