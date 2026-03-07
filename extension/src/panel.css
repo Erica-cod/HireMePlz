@@ -1,70 +1,138 @@
+#hiremeplz-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999999;
+}
+
+#hiremeplz-fab-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #2563eb;
+  color: white;
+  padding: 12px 20px;
+  border-radius: 50px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: background 0.2s;
+}
+
+#hiremeplz-fab-btn:hover {
+  background: #1d4ed8;
+}
+
+.hiremeplz-badge {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
 #hiremeplz-panel {
   position: fixed;
-  top: 16px;
-  right: 16px;
-  width: 360px;
-  max-height: calc(100vh - 32px);
-  overflow: auto;
-  z-index: 2147483647;
-  background: #0f172a;
-  color: #e2e8f0;
-  border: 1px solid #334155;
-  border-radius: 16px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-#hiremeplz-panel * {
-  box-sizing: border-box;
-}
-
-#hiremeplz-panel .panel-body {
-  display: grid;
-  gap: 12px;
-  padding: 16px;
-}
-
-#hiremeplz-panel input,
-#hiremeplz-panel textarea {
-  width: 100%;
-  border: 1px solid #475569;
-  background: #020617;
-  color: #e2e8f0;
-  border-radius: 10px;
-  padding: 10px 12px;
-}
-
-#hiremeplz-panel textarea {
-  min-height: 72px;
-  resize: vertical;
-}
-
-#hiremeplz-panel button {
-  border: none;
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-#hiremeplz-panel .primary {
-  background: #38bdf8;
-  color: #082f49;
-}
-
-#hiremeplz-panel .secondary {
-  background: #1e293b;
-  color: #e2e8f0;
-  border: 1px solid #475569;
-}
-
-#hiremeplz-panel .suggestion {
-  border: 1px solid #334155;
+  top: 50%;
+  right: 24px;
+  transform: translateY(-50%);
+  width: 400px;
+  max-height: 80vh;
+  background: white;
   border-radius: 12px;
-  padding: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  z-index: 9999999;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  display: flex;
+  flex-direction: column;
 }
 
-#hiremeplz-panel .muted {
-  color: #94a3b8;
+.hiremeplz-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.hiremeplz-panel-header button {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #6b7280;
+}
+
+.hiremeplz-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 20px;
+}
+
+.hiremeplz-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.hiremeplz-field-label {
+  width: 120px;
   font-size: 12px;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.hiremeplz-field-value {
+  flex: 1;
+}
+
+.hiremeplz-input {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 13px;
+  outline: none;
+}
+
+.hiremeplz-input:focus {
+  border-color: #2563eb;
+}
+
+.hiremeplz-field-conf {
+  width: 20px;
+  text-align: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.hiremeplz-panel-footer {
+  padding: 12px 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+#hiremeplz-fill-btn {
+  width: 100%;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#hiremeplz-fill-btn:hover {
+  background: #1d4ed8;
 }

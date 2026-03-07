@@ -3,26 +3,30 @@
 export const dynamic = "force-dynamic";
 
 import { useState } from "react";
-
 import { apiRequest } from "../../lib/api";
 
 export default function AuthPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function handleSubmit() {
-    try {
-      setLoading(true);
-      setMessage("");
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setMessage("");
+    setLoading(true);
 
-      const data = await apiRequest<{
-        token: string;
-      }>(`/auth/${mode}`, {
+    try {
+      const body =
+        mode === "register"
+          ? { email, password, name }
+          : { email, password };
+
+      const data = await apiRequest<{ token: string }>(`/auth/${mode}`, {
         method: "POST",
-        body: { email, password }
+        body,
       });
 
       window.localStorage.setItem("hiremeplz-token", data.token);
@@ -35,36 +39,74 @@ export default function AuthPage() {
   }
 
   return (
-    <main className="page">
-      <div className="card stack" style={{ maxWidth: 560, margin: "0 auto" }}>
-        <h1>{mode === "login" ? "Sign in" : "Register"} HireMePlz</h1>
-        <p className="muted">
-          After signing in, you can manage your profile and provide data for the Chrome autofill extension.
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="w-full max-w-md rounded-xl border bg-white p-8 shadow-sm">
+        <h1 className="text-2xl font-bold mb-6 text-center">
+          {mode === "login" ? "Sign In" : "Create Account"}
+        </h1>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {mode === "register" && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full rounded-lg border px-3 py-2"
+                required
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-lg border px-3 py-2"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-lg border px-3 py-2"
+              required
+            />
+          </div>
+
+          {message && <p className="text-red-600 text-sm">{message}</p>}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-lg bg-blue-600 py-2 text-white font-medium hover:bg-blue-700 transition disabled:opacity-50"
+          >
+            {loading ? "..." : mode === "login" ? "Sign In" : "Register"}
+          </button>
+        </form>
+
+        <p className="mt-4 text-center text-sm text-gray-500">
+          {mode === "login"
+            ? "Don't have an account?"
+            : "Already have an account?"}{" "}
+          <button
+            onClick={() => {
+              setMode(mode === "login" ? "register" : "login");
+              setMessage("");
+            }}
+            className="text-blue-600 hover:underline"
+          >
+            {mode === "login" ? "Register" : "Sign in"}
+          </button>
         </p>
-        <input
-          className="input"
-          placeholder="Email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-        />
-        <input
-          className="input"
-          placeholder="Password"
-          type="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-        />
-        <button className="button primary" onClick={handleSubmit} disabled={loading}>
-          {loading ? "Submitting..." : mode === "login" ? "Sign in" : "Register"}
-        </button>
-        <button
-          className="button secondary"
-          onClick={() => setMode(mode === "login" ? "register" : "login")}
-        >
-          Switch to {mode === "login" ? "Register" : "Sign in"}
-        </button>
-        {message ? <p>{message}</p> : null}
       </div>
-    </main>
+    </div>
   );
 }

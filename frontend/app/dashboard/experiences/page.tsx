@@ -3,20 +3,13 @@
 export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
-
 import { AuthGate } from "../../../components/auth-gate";
-import { DashboardLayout } from "../../../components/dashboard-layout";
 import { apiRequest, splitCommaText } from "../../../lib/api";
 import type { Experience } from "../../../types";
 
 export default function ExperiencesPage() {
   return (
-    <DashboardLayout
-      title="Experience Library"
-      description="Project, internship, and work experience are used for both long-form answer generation and job matching."
-    >
-      <AuthGate>{(token) => <ExperiencesContent token={token} />}</AuthGate>
-    </DashboardLayout>
+    <AuthGate>{(token) => <ExperiencesContent token={token} />}</AuthGate>
   );
 }
 
@@ -29,7 +22,7 @@ function ExperiencesContent({ token }: { token: string }) {
     location: "",
     description: "",
     highlights: "",
-    skills: ""
+    skills: "",
   });
 
   function loadData() {
@@ -50,8 +43,8 @@ function ExperiencesContent({ token }: { token: string }) {
         body: {
           ...form,
           highlights: splitCommaText(form.highlights),
-          skills: splitCommaText(form.skills)
-        }
+          skills: splitCommaText(form.skills),
+        },
       });
       setForm({
         title: "",
@@ -59,7 +52,7 @@ function ExperiencesContent({ token }: { token: string }) {
         location: "",
         description: "",
         highlights: "",
-        skills: ""
+        skills: "",
       });
       setMessage("Experience saved");
       loadData();
@@ -69,81 +62,124 @@ function ExperiencesContent({ token }: { token: string }) {
   }
 
   return (
-    <div className="grid two">
-      <section className="card stack">
-        <h2>Add Experience</h2>
-        <input
-          className="input"
-          placeholder="Title, e.g. Software Engineer Intern"
-          value={form.title}
-          onChange={(event) =>
-            setForm((current) => ({ ...current, title: event.target.value }))
-          }
-        />
-        <input
-          className="input"
-          placeholder="Company"
-          value={form.company}
-          onChange={(event) =>
-            setForm((current) => ({ ...current, company: event.target.value }))
-          }
-        />
-        <input
-          className="input"
-          placeholder="Location"
-          value={form.location}
-          onChange={(event) =>
-            setForm((current) => ({ ...current, location: event.target.value }))
-          }
-        />
-        <textarea
-          className="textarea"
-          placeholder="Describe what you did in this role"
-          value={form.description}
-          onChange={(event) =>
-            setForm((current) => ({ ...current, description: event.target.value }))
-          }
-        />
-        <input
-          className="input"
-          placeholder="Highlights, separated by commas"
-          value={form.highlights}
-          onChange={(event) =>
-            setForm((current) => ({ ...current, highlights: event.target.value }))
-          }
-        />
-        <input
-          className="input"
-          placeholder="Skills used, separated by commas"
-          value={form.skills}
-          onChange={(event) =>
-            setForm((current) => ({ ...current, skills: event.target.value }))
-          }
-        />
-        <button className="button primary" onClick={createExperience}>
-          Save experience
-        </button>
-        {message ? <p>{message}</p> : null}
-      </section>
+    <div className="max-w-3xl">
+      <h1 className="text-2xl font-bold mb-6">Experience Library</h1>
 
-      <section className="card stack">
-        <h2>Saved Experiences</h2>
-        <div className="list">
-          {experiences.map((experience) => (
-            <div className="listItem" key={experience.id}>
-              <strong>
-                {experience.title} {experience.company ? `@ ${experience.company}` : ""}
-              </strong>
-              <p className="muted">{experience.location || "Location not provided"}</p>
-              <p>{experience.description}</p>
-              <p className="muted">Skills: {experience.skills.join(", ") || "Not provided"}</p>
+      {message && <p className="text-sm text-blue-600 mb-4">{message}</p>}
+
+      <div className="rounded-xl border bg-white p-6 shadow-sm mb-6">
+        <h2 className="text-lg font-semibold mb-4">Add Experience</h2>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Title</label>
+              <input
+                type="text"
+                placeholder="e.g. Software Engineer Intern"
+                value={form.title}
+                onChange={(e) =>
+                  setForm({ ...form, title: e.target.value })
+                }
+                className="w-full rounded-lg border px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Company</label>
+              <input
+                type="text"
+                value={form.company}
+                onChange={(e) =>
+                  setForm({ ...form, company: e.target.value })
+                }
+                className="w-full rounded-lg border px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Location</label>
+            <input
+              type="text"
+              value={form.location}
+              onChange={(e) =>
+                setForm({ ...form, location: e.target.value })
+              }
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Description
+            </label>
+            <textarea
+              value={form.description}
+              onChange={(e) =>
+                setForm({ ...form, description: e.target.value })
+              }
+              rows={3}
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Highlights (comma separated)
+            </label>
+            <input
+              type="text"
+              value={form.highlights}
+              onChange={(e) =>
+                setForm({ ...form, highlights: e.target.value })
+              }
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Skills used (comma separated)
+            </label>
+            <input
+              type="text"
+              value={form.skills}
+              onChange={(e) =>
+                setForm({ ...form, skills: e.target.value })
+              }
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+            />
+          </div>
+          <button
+            onClick={createExperience}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white font-medium hover:bg-blue-700"
+          >
+            Save Experience
+          </button>
+        </div>
+      </div>
+
+      {experiences.length === 0 ? (
+        <div className="rounded-xl border bg-white p-6 shadow-sm text-center text-gray-500">
+          <p>No experiences yet. Add 2-3 records to improve autofill quality.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {experiences.map((exp) => (
+            <div
+              key={exp.id}
+              className="rounded-xl border bg-white p-6 shadow-sm"
+            >
+              <h3 className="font-semibold">
+                {exp.title}
+                {exp.company ? ` @ ${exp.company}` : ""}
+              </h3>
+              <p className="text-sm text-gray-500">
+                {exp.location || "Location not provided"}
+              </p>
+              <p className="text-sm text-gray-600 mt-1">{exp.description}</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Skills: {exp.skills.join(", ") || "Not provided"}
+              </p>
             </div>
           ))}
-          {experiences.length === 0 ? (
-            <p className="muted">No experiences yet. It is recommended to add at least 2 to 3 records.</p>
-          ) : null}
         </div>
-      </section>
+      )}
     </div>
   );
 }
