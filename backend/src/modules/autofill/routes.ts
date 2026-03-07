@@ -7,6 +7,7 @@ import {
   AuthenticatedRequest,
   requireAuth
 } from "../../middleware/auth.js";
+import { asyncHandler } from "../../middleware/async-handler.js";
 
 const router = Router();
 
@@ -31,7 +32,7 @@ const suggestionSchema = z.object({
 router.post(
   "/suggestions",
   requireAuth,
-  async (request: AuthenticatedRequest, response) => {
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
     const payload = suggestionSchema.parse(request.body);
 
     const [profile, stories, experiences] = await Promise.all([
@@ -58,13 +59,13 @@ router.post(
     });
 
     response.json({ suggestions });
-  }
+  })
 );
 
 router.post(
   "/record",
   requireAuth,
-  async (request: AuthenticatedRequest, response) => {
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
     const payload = z
       .object({
         company: z.string().min(1),
@@ -96,7 +97,7 @@ router.post(
     });
 
     response.status(201).json({ application });
-  }
+  })
 );
 
 export const autofillRouter = router;

@@ -5,13 +5,14 @@ import {
   AuthenticatedRequest,
   requireAuth
 } from "../../middleware/auth.js";
+import { asyncHandler } from "../../middleware/async-handler.js";
 
 const router = Router();
 
 router.get(
   "/recommendations",
   requireAuth,
-  async (request: AuthenticatedRequest, response) => {
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
     const matches = await prisma.jobMatch.findMany({
       where: { userId: request.userId },
       include: { job: true },
@@ -20,7 +21,7 @@ router.get(
     });
 
     response.json({ matches });
-  }
+  })
 );
 
 export const jobsRouter = router;

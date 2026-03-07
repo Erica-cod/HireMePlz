@@ -6,6 +6,7 @@ import {
   AuthenticatedRequest,
   requireAuth
 } from "../../middleware/auth.js";
+import { asyncHandler } from "../../middleware/async-handler.js";
 
 const router = Router();
 
@@ -23,20 +24,20 @@ const experienceSchema = z.object({
 router.get(
   "/",
   requireAuth,
-  async (request: AuthenticatedRequest, response) => {
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
     const experiences = await prisma.experience.findMany({
       where: { userId: request.userId },
       orderBy: { createdAt: "desc" }
     });
 
     response.json({ experiences });
-  }
+  })
 );
 
 router.post(
   "/",
   requireAuth,
-  async (request: AuthenticatedRequest, response) => {
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
     const payload = experienceSchema.parse(request.body);
 
     const experience = await prisma.experience.create({
@@ -54,13 +55,13 @@ router.post(
     });
 
     response.status(201).json({ experience });
-  }
+  })
 );
 
 router.put(
   "/:experienceId",
   requireAuth,
-  async (request: AuthenticatedRequest, response) => {
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
     const experienceId = String(request.params.experienceId);
     const payload = experienceSchema.parse(request.body);
     const existing = await prisma.experience.findFirst({
@@ -87,13 +88,13 @@ router.put(
     });
 
     response.json({ experience });
-  }
+  })
 );
 
 router.delete(
   "/:experienceId",
   requireAuth,
-  async (request: AuthenticatedRequest, response) => {
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
     const experienceId = String(request.params.experienceId);
     const existing = await prisma.experience.findFirst({
       where: { id: experienceId, userId: request.userId }
@@ -109,7 +110,7 @@ router.delete(
     });
 
     response.status(204).send();
-  }
+  })
 );
 
 export const experienceRouter = router;
