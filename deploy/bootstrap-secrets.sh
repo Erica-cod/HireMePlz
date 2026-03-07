@@ -14,6 +14,7 @@ set -eu
 # ADZUNA_APP_KEY
 # SENDGRID_API_KEY
 # SENDGRID_FROM_EMAIL
+# GRAFANA_ADMIN_PASSWORD
 
 SECRETS_FILE="${1:-./deploy/secrets.env}"
 
@@ -52,5 +53,6 @@ ensure_secret "adzuna_app_id" "${ADZUNA_APP_ID:-}"
 ensure_secret "adzuna_app_key" "${ADZUNA_APP_KEY:-}"
 ensure_secret "sendgrid_api_key" "${SENDGRID_API_KEY:-}"
 ensure_secret "sendgrid_from_email" "${SENDGRID_FROM_EMAIL:-}"
+ensure_secret "grafana_admin_password" "${GRAFANA_ADMIN_PASSWORD:-}"
 
 echo "Secret bootstrap complete."

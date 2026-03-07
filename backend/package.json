@@ -19,6 +19,7 @@
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "openai": "^4.86.1",
+    "prom-client": "^15.1.3",
     "zod": "^3.24.2"
   },
   "devDependencies": {

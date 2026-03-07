@@ -66,6 +66,12 @@ You can also run the development environment with Docker Compose:
 docker compose up --build
 ```
 
+Monitoring services are included in Docker Compose:
+
+- Prometheus: `http://localhost:9090`
+- Alertmanager: `http://localhost:9093`
+- Grafana: `http://localhost:3001`
+
 ## Production (Swarm + HTTPS)
 
 Production deployment supports Docker Swarm with a Traefik HTTPS reverse proxy, and uses Docker secrets for sensitive configuration.
@@ -75,6 +81,7 @@ Production deployment supports Docker Swarm with a Traefik HTTPS reverse proxy, 
 - Secrets bootstrap script: `deploy/bootstrap-secrets.sh`
 - Deployment script: `deploy/deploy-stack.sh`
 - Detailed guide: `docs/deployment.md`
+- Monitoring config: `deploy/monitoring/*`
 
 GitHub Actions already includes an automatic deployment stage (triggered on push to `main`/`master`).
 

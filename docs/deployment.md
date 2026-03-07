@@ -23,6 +23,9 @@ Default service ports:
 - Frontend: `3000`
 - Backend: `4000`
 - Database: `5432`
+- Prometheus: `9090`
+- Alertmanager: `9093`
+- Grafana: `3001`
 
 ## Docker Swarm
 
@@ -85,9 +88,45 @@ The stack routes:
 
 ## Monitoring Recommendations
 
-- Minimum setup: enable DigitalOcean CPU, memory, disk, and container restart alerts
-- Backend should expose `/api/health` probe checks
-- For extended monitoring, integrate Prometheus + Grafana or use cloud-native monitoring
+Monitoring is now implemented in this repository with Prometheus + Grafana + exporters.
+
+### Included Components
+
+- Prometheus (`prom/prometheus`) for scraping and alert rule evaluation
+- Alertmanager (`prom/alertmanager`) for alert routing
+- Grafana (`grafana/grafana`) with pre-provisioned datasource + dashboard
+- cAdvisor (`gcr.io/cadvisor/cadvisor`) for container metrics
+- node-exporter (`prom/node-exporter`) for host metrics
+- Backend application metrics endpoint at `/metrics`
+
+### Metrics and Alerts
+
+- Prometheus config: `deploy/monitoring/prometheus.yml`
+- Alert rules: `deploy/monitoring/alerts.yml`
+- Alertmanager config: `deploy/monitoring/alertmanager.yml`
+- Grafana provisioning:
+  - `deploy/monitoring/grafana/provisioning/datasources/datasource.yml`
+  - `deploy/monitoring/grafana/provisioning/dashboards/dashboards.yml`
+  - `deploy/monitoring/grafana/dashboards/hiremeplz-overview.json`
+
+Implemented alert examples:
+
+- Backend down (`BackendDown`)
+- High backend p95 latency (`HighBackendP95Latency`)
+- Elevated 5xx ratio (`High5xxRate`)
+- Missing exporter targets (`NodeExporterDown`, `CAdvisorDown`)
+
+### Swarm Monitoring Access
+
+- Add `MONITORING_DOMAIN` to `deploy/swarm.env` (defaults to `monitor.<DOMAIN>` if omitted)
+- Add `GRAFANA_ADMIN_USER` in `deploy/swarm.env` (optional, defaults to `admin`)
+- Create secret `grafana_admin_password` (via `deploy/bootstrap-secrets.sh`)
+
+Grafana will be exposed at:
+
+- `https://<MONITORING_DOMAIN>`
+
+Prometheus and Alertmanager stay internal by default.
 
 ## GitHub Actions CD (Auto Deploy)
 
@@ -100,9 +139,11 @@ Required repository secrets:
 - `SWARM_SSH_KEY`
 - `DEPLOY_PATH` (absolute path on server where `deploy/` files are copied)
 - `DEPLOY_DOMAIN`
+- `MONITORING_DOMAIN` (optional; defaults to `monitor.<DEPLOY_DOMAIN>`)
 - `LETSENCRYPT_EMAIL`
 - `OPENAI_MODEL` (optional; defaults to `gpt-4o-mini`)
 - `JOB_ALERT_MIN_SCORE` (optional; defaults to `0.75`)
+- `GRAFANA_ADMIN_USER` (optional; defaults to `admin`)
 - `SWARM_POSTGRES_PASSWORD`
 - `SWARM_DATABASE_URL`
 - `SWARM_JWT_SECRET`
@@ -112,5 +153,6 @@ Required repository secrets:
 - `SWARM_ADZUNA_APP_KEY`
 - `SWARM_SENDGRID_API_KEY`
 - `SWARM_SENDGRID_FROM_EMAIL`
+- `SWARM_GRAFANA_ADMIN_PASSWORD`
 
 The workflow builds/pushes backend/frontend/worker images to GHCR, ensures required Docker secrets exist on the Swarm manager, then deploys `deploy/swarm-stack.yml`.

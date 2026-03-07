@@ -22,8 +22,10 @@ if [ -z "${IMAGE_REGISTRY:-}" ] || [ -z "${IMAGE_TAG:-}" ] || [ -z "${DOMAIN:-}"
 fi
 
 export IMAGE_REGISTRY IMAGE_TAG DOMAIN LETSENCRYPT_EMAIL
+export MONITORING_DOMAIN="${MONITORING_DOMAIN:-monitor.${DOMAIN}}"
 export OPENAI_MODEL="${OPENAI_MODEL:-gpt-4o-mini}"
 export JOB_ALERT_MIN_SCORE="${JOB_ALERT_MIN_SCORE:-0.75}"
+export GRAFANA_ADMIN_USER="${GRAFANA_ADMIN_USER:-admin}"
 
 docker stack deploy \
   -c deploy/swarm-stack.yml \
