@@ -1,45 +1,45 @@
 # HireMePlz
 
-HireMePlz 是一个帮助求职者集中管理资料、智能填写申请表、记录申请历史并推荐岗位的项目。当前仓库按照 MVP 优先原则实现了四个核心子项目：
+HireMePlz is a project that helps job seekers centrally manage their data, intelligently fill application forms, track application history, and get job recommendations. This repository currently implements four core subprojects with an MVP-first scope:
 
-- `frontend`：Next.js Web 控制台
-- `backend`：Express + Prisma API
-- `extension`：Chrome 插件，负责识别页面字段并填充
-- `worker`：后台职位抓取与匹配任务
+- `frontend`: Next.js web dashboard
+- `backend`: Express + Prisma API
+- `extension`: Chrome extension for form field detection and filling
+- `worker`: background job fetching and matching tasks
 
-## MVP 范围
+## MVP Scope
 
-当前优先保证以下链路可跑通：
+The current priority is to ensure this end-to-end flow works:
 
-1. 用户注册登录
-2. 维护个人资料、经历和故事库
-3. Chrome 插件扫描当前申请页面字段
-4. 后端返回结构化字段建议和开放题建议
-5. 用户确认后填入页面
-6. 自动记录本次申请
+1. User registration and login
+2. Maintain profile, experiences, and story library
+3. Chrome extension scans fields on the current application page
+4. Backend returns structured field suggestions and open-ended answer suggestions
+5. User confirms suggestions and fills the page
+6. Automatically record the application session
 
-## 快速开始
+## Quick Start
 
-1. 复制环境变量模板：
+1. Copy the environment variable template:
 
 ```bash
 cp .env.example .env
 ```
 
-2. 安装依赖：
+2. Install dependencies:
 
 ```bash
 npm install
 ```
 
-3. 生成 Prisma Client 并同步数据库：
+3. Generate Prisma Client and sync the database:
 
 ```bash
 npm run db:generate
 npm run db:push
 ```
 
-4. 分别启动服务：
+4. Start services in separate terminals:
 
 ```bash
 npm run dev:backend
@@ -47,7 +47,7 @@ npm run dev:frontend
 npm run dev:worker
 ```
 
-5. 构建插件：
+5. Build the extension:
 
 ```bash
 npm run build --workspace extension
@@ -55,7 +55,7 @@ npm run build --workspace extension
 
 ## Docker
 
-开发环境也可以使用 Docker Compose：
+You can also run the development environment with Docker Compose:
 
 ```bash
 docker compose up --build
@@ -63,19 +63,19 @@ docker compose up --build
 
 ## Production (Swarm + HTTPS)
 
-生产部署支持 Docker Swarm + Traefik HTTPS 反向代理，并使用 Docker secrets 管理敏感配置。
+Production deployment supports Docker Swarm with a Traefik HTTPS reverse proxy, and uses Docker secrets for sensitive configuration.
 
-- 栈配置：`deploy/swarm-stack.yml`
-- 部署变量示例：`deploy/swarm.env.example`
-- Secrets 引导脚本：`deploy/bootstrap-secrets.sh`
-- 部署脚本：`deploy/deploy-stack.sh`
-- 详细说明：`docs/deployment.md`
+- Stack configuration: `deploy/swarm-stack.yml`
+- Deployment variable example: `deploy/swarm.env.example`
+- Secrets bootstrap script: `deploy/bootstrap-secrets.sh`
+- Deployment script: `deploy/deploy-stack.sh`
+- Detailed guide: `docs/deployment.md`
 
-GitHub Actions 已包含自动部署阶段（push 到 `main`/`master` 时触发）。
+GitHub Actions already includes an automatic deployment stage (triggered on push to `main`/`master`).
 
-## 模块说明
+## Module Overview
 
-- `backend` 暴露认证、资料管理、故事库、申请记录、智能建议和岗位推荐 API
-- `frontend` 提供管理后台页面
-- `extension` 以内容脚本方式扫描表单并调用 API
-- `worker` 支持职位抓取和匹配，可在无外部 API key 时回退到内置示例数据
+- `backend` exposes APIs for authentication, profile management, story library, application records, intelligent suggestions, and job recommendations
+- `frontend` provides dashboard pages
+- `extension` scans form fields via content scripts and calls backend APIs
+- `worker` supports job fetching and matching, and falls back to built-in sample data when external API keys are unavailable
