@@ -35,13 +35,17 @@ router.post(
   asyncHandler(async (request: AuthenticatedRequest, response) => {
     const payload = suggestionSchema.parse(request.body);
 
-    const [user, profile, stories, experiences] = await Promise.all([
+    const [user, profile, educations, stories, experiences] = await Promise.all([
       prisma.user.findUnique({
         where: { id: request.userId },
         select: { email: true }
       }),
       prisma.profile.findUnique({
         where: { userId: request.userId }
+      }),
+      prisma.education.findMany({
+        where: { userId: request.userId },
+        orderBy: { createdAt: "desc" }
       }),
       prisma.storyItem.findMany({
         where: { userId: request.userId },
@@ -57,6 +61,7 @@ router.post(
       userId: request.userId!,
       fields: payload.fields,
       profile,
+      educations,
       userEmail: user?.email,
       stories,
       experiences,

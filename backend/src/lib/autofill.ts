@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { Experience, Profile, StoryItem } from "@prisma/client";
+import type { Education, Experience, Profile, StoryItem } from "@prisma/client";
 
 import { env } from "../config/env.js";
 import { prisma } from "./prisma.js";
@@ -36,10 +36,13 @@ type StructuredRuleKey =
   | "location"
   | "school"
   | "degree"
+  | "fieldOfStudy"
+  | "graduationYear"
   | "linkedinUrl"
   | "githubUrl"
   | "portfolioUrl"
-  | "visaStatus";
+  | "visaStatus"
+  | "skills";
 
 const structuredRules: Array<{
   key: StructuredRuleKey;
@@ -51,12 +54,15 @@ const structuredRules: Array<{
   { key: "fullName", aliases: ["full name", "name", "legal name"] },
   { key: "phone", aliases: ["phone", "mobile", "contact number"] },
   { key: "location", aliases: ["location", "city", "address"] },
-  { key: "school", aliases: ["school", "university", "college"] },
-  { key: "degree", aliases: ["degree", "education level", "major"] },
-  { key: "linkedinUrl", aliases: ["linkedin", "linkedin profile"] },
-  { key: "githubUrl", aliases: ["github", "github profile"] },
+  { key: "school", aliases: ["school", "university", "college", "institution", "school name"] },
+  { key: "degree", aliases: ["degree", "education level"] },
+  { key: "fieldOfStudy", aliases: ["area of study", "area(s) of study", "field of study", "major", "program", "concentration", "discipline", "specialization"] },
+  { key: "graduationYear", aliases: ["graduation year", "grad year", "expected graduation", "year of graduation"] },
+  { key: "linkedinUrl", aliases: ["linkedin", "linkedin profile", "linkedin url"] },
+  { key: "githubUrl", aliases: ["github", "github profile", "github url"] },
   { key: "portfolioUrl", aliases: ["portfolio", "website", "personal site"] },
-  { key: "visaStatus", aliases: ["visa", "work authorization", "sponsorship"] }
+  { key: "visaStatus", aliases: ["visa", "work authorization", "sponsorship"] },
+  { key: "skills", aliases: ["skills", "technical skills", "programming languages", "technologies"] }
 ];
 
 function normalizeText(...parts: Array<string | undefined>) {
@@ -99,10 +105,12 @@ function isOpenQuestion(field: AutofillFieldInput) {
 
 function getStructuredValue(params: {
   profile: Profile | null;
+  educations: Education[];
   key: StructuredRuleKey;
   userEmail?: string;
 }) {
-  const { key, profile, userEmail } = params;
+  const { key, profile, educations, userEmail } = params;
+  const latestEdu = educations[0] ?? null;
 
   if (key === "email") {
     return userEmail || "";
@@ -115,6 +123,29 @@ function getStructuredValue(params: {
   if (key === "lastName") {
     const parts = profile?.fullName?.trim().split(/\s+/) || [];
     return parts.length > 1 ? parts[parts.length - 1] : "";
+  }
+
+  if (key === "fieldOfStudy") {
+    return latestEdu?.fieldOfStudy || profile?.degree || "";
+  }
+
+  if (key === "school") {
+    return latestEdu?.school || profile?.school || "";
+  }
+
+  if (key === "degree") {
+    return latestEdu?.degree || profile?.degree || "";
+  }
+
+  if (key === "graduationYear") {
+    if (latestEdu?.endDate) {
+      return String(latestEdu.endDate.getFullYear());
+    }
+    return profile?.graduationYear ? String(profile.graduationYear) : "";
+  }
+
+  if (key === "skills") {
+    return profile?.skills?.join(", ") || "";
   }
 
   if (!profile) {
@@ -136,6 +167,7 @@ function getStructuredValue(params: {
 export function scoreStructuredField(
   field: AutofillFieldInput,
   profile: Profile | null,
+  educations: Education[],
   userEmail?: string
 ) {
   const normalized = normalizeText(
@@ -155,7 +187,7 @@ export function scoreStructuredField(
       }
     }
 
-    const value = getStructuredValue({ profile, key: rule.key, userEmail });
+    const value = getStructuredValue({ profile, educations, key: rule.key, userEmail });
     if (!value || score <= 0) {
       continue;
     }
@@ -278,13 +310,14 @@ export async function buildSuggestions(params: {
   userId: string;
   fields: AutofillFieldInput[];
   profile: Profile | null;
+  educations: Education[];
   userEmail?: string;
   stories: StoryItem[];
   experiences: Experience[];
   company?: string;
   role?: string;
 }) {
-  const { company, experiences, fields, profile, role, stories, userEmail, userId } = params;
+  const { company, educations, experiences, fields, profile, role, stories, userEmail, userId } = params;
   const suggestions: AutofillSuggestion[] = [];
 
   for (const field of fields) {
@@ -381,7 +414,7 @@ export async function buildSuggestions(params: {
       continue;
     }
 
-    const structured = scoreStructuredField(field, profile, userEmail);
+    const structured = scoreStructuredField(field, profile, educations, userEmail);
     if (structured) {
       suggestions.push(structured);
     }
