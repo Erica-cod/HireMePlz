@@ -34,7 +34,7 @@ spec:
         - protocol: TCP
           port: 3000
 ---
-# backend: allow traffic from Ingress Controller and in-namespace pods
+# backend: allow traffic from Ingress Controller, frontend, and Prometheus
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -60,6 +60,9 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: frontend
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
       ports:
         - protocol: TCP
           port: 4000
@@ -121,3 +124,75 @@ spec:
       ports:
         - protocol: TCP
           port: 6379
+---
+# prometheus: allow Grafana to query metrics
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-ingress
+  namespace: hiremeplz
+  labels:
+    app.kubernetes.io/part-of: hiremeplz
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: grafana
+      ports:
+        - protocol: TCP
+          port: 9090
+---
+# grafana: allow Ingress Controller to access dashboards
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-grafana-ingress
+  namespace: hiremeplz
+  labels:
+    app.kubernetes.io/part-of: hiremeplz
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 3000
+---
+# loki: allow Grafana and Promtail
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-loki-ingress
+  namespace: hiremeplz
+  labels:
+    app.kubernetes.io/part-of: hiremeplz
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: loki
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: grafana
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: promtail
+      ports:
+        - protocol: TCP
+          port: 3100

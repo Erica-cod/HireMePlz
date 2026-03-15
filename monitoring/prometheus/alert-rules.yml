@@ -1,0 +1,106 @@
+groups:
+  - name: hiremeplz-infra
+    rules:
+      # ---- 容器 / 进程级别 ----
+      - alert: HighCpuUsage
+        expr: rate(process_cpu_seconds_total{job="hiremeplz-backend"}[5m]) * 100 > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backend CPU 使用率超过 80%"
+          description: "Backend 进程 5 分钟平均 CPU 使用率为 {{ $value | printf \"%.1f\" }}%"
+
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes{job="hiremeplz-backend"} / 536870912 * 100 > 85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backend 内存使用率超过 85%（相对 512Mi 限制）"
+          description: "当前 RSS 内存 {{ $value | humanize1024 }}B"
+
+      - alert: HeapMemoryHigh
+        expr: hiremeplz_nodejs_heap_size_used_bytes / hiremeplz_nodejs_heap_size_total_bytes * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "V8 堆内存使用率超过 90%"
+          description: "可能即将 OOM，当前堆使用率 {{ $value | printf \"%.1f\" }}%"
+
+  - name: hiremeplz-http
+    rules:
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(hiremeplz_http_requests_total{status_code=~"5.."}[5m]))
+          /
+          sum(rate(hiremeplz_http_requests_total[5m]))
+          * 100 > 5
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "5xx 错误率超过 5%"
+          description: "过去 5 分钟的 5xx 错误率为 {{ $value | printf \"%.2f\" }}%"
+
+      - alert: HighRequestLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(hiremeplz_http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 2
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P95 请求延迟超过 2 秒"
+          description: "当前 P95 延迟 {{ $value | printf \"%.2f\" }}s"
+
+      - alert: TooManyRequestsInFlight
+        expr: hiremeplz_http_requests_in_flight > 100
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "并发请求数过高"
+          description: "当前有 {{ $value }} 个请求正在处理"
+
+  - name: hiremeplz-queues
+    rules:
+      - alert: QueueBacklog
+        expr: hiremeplz_queue_waiting > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "队列 {{ $labels.queue }} 积压过多"
+          description: "等待处理的任务数为 {{ $value }}"
+
+      - alert: QueueFailedJobs
+        expr: increase(hiremeplz_queue_failed[15m]) > 10
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "队列 {{ $labels.queue }} 在 15 分钟内失败任务过多"
+          description: "失败任务增长 {{ $value }}"
+
+  - name: hiremeplz-nodejs
+    rules:
+      - alert: EventLoopLagHigh
+        expr: hiremeplz_nodejs_eventloop_lag_seconds > 0.5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Node.js 事件循环延迟过高"
+          description: "事件循环延迟 {{ $value | printf \"%.3f\" }}s，可能影响响应时间"
+
+      - alert: TooManyActiveHandles
+        expr: hiremeplz_nodejs_active_handles_total > 500
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Node.js 活跃句柄数过多"
+          description: "当前 {{ $value }} 个活跃句柄"

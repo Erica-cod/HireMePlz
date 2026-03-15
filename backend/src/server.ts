@@ -3,9 +3,13 @@ import { app } from "./app.js";
 import { prisma } from "./lib/prisma.js";
 import { llmQueue, llmQueueEvents } from "./lib/llm-queue.js";
 import { scrapeTriggerQueue } from "./lib/scrape-trigger.js";
+import { startQueueMetricsCollector } from "./lib/metrics.js";
+
+startQueueMetricsCollector();
 
 const server = app.listen(env.PORT, () => {
   console.log(`HireMePlz backend listening on http://localhost:${env.PORT}`);
+  console.log(`Prometheus metrics available at http://localhost:${env.PORT}/metrics`);
 });
 
 let shuttingDown = false;
