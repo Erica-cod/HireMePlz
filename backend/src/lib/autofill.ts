@@ -1,9 +1,10 @@
-import { OpenAI } from "openai";
 import { createHash } from "node:crypto";
 import type { Experience, Profile, StoryItem } from "@prisma/client";
 
 import { env } from "../config/env.js";
 import { prisma } from "./prisma.js";
+import { llmQueue, llmQueueEvents } from "./llm-queue.js";
+import type { LlmJobResult } from "./llm-queue.js";
 
 export type AutofillFieldInput = {
   id: string;
@@ -39,10 +40,6 @@ type StructuredRuleKey =
   | "githubUrl"
   | "portfolioUrl"
   | "visaStatus";
-
-const openai = env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: env.OPENAI_API_KEY })
-  : null;
 
 const structuredRules: Array<{
   key: StructuredRuleKey;
@@ -233,38 +230,48 @@ function buildFallbackAnswer(
 }
 
 async function buildOpenEndedAnswer(params: {
+  userId: string;
   question: string;
   company?: string;
   role?: string;
   story: StoryItem | null;
   experiences: Experience[];
 }) {
-  const { company, experiences, question, role, story } = params;
+  const { company, experiences, question, role, story, userId } = params;
 
-  if (!openai) {
+  const job = await llmQueue.add(
+    "autofill",
+    {
+      userId,
+      question,
+      company,
+      role,
+      story: story
+        ? {
+            title: story.title,
+            situation: story.situation,
+            task: story.task,
+            action: story.action,
+            result: story.result
+          }
+        : null,
+      experiences: experiences.slice(0, 3).map((exp) => ({
+        title: exp.title,
+        description: exp.description
+      }))
+    },
+    { removeOnComplete: 100, removeOnFail: 200 }
+  );
+
+  try {
+    const result = (await job.waitUntilFinished(
+      llmQueueEvents,
+      env.LLM_JOB_TIMEOUT_MS
+    )) as LlmJobResult;
+    return result.answer;
+  } catch {
     return buildFallbackAnswer(question, company, role, story, experiences);
   }
-
-  const prompt = [
-    "You are a job application assistant.",
-    "Generate an English answer suitable for a software engineering application form using the user's experience details.",
-    "Requirements: natural, specific, not exaggerated, and around 120 to 180 words.",
-    `Role: ${role || "Not provided"}`,
-    `Company: ${company || "Not provided"}`,
-    `Question: ${question}`,
-    `Story title: ${story?.title || "Not provided"}`,
-    `Situation: ${story?.situation || "Not provided"}`,
-    `Task: ${story?.task || "Not provided"}`,
-    `Action: ${story?.action || "Not provided"}`,
-    `Result: ${story?.result || "Not provided"}`
-  ].join("\n");
-
-  const completion = await openai.responses.create({
-    model: env.OPENAI_MODEL,
-    input: prompt
-  });
-
-  return completion.output_text.trim();
 }
 
 export async function buildSuggestions(params: {
@@ -327,6 +334,7 @@ export async function buildSuggestions(params: {
 
       const story = pickRelevantStory(question, stories);
       const value = await buildOpenEndedAnswer({
+        userId,
         question,
         company,
         role,

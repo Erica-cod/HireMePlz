@@ -1,0 +1,271 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum StoryCategory {
+  challenge
+  leadership
+  teamwork
+  project
+  why_company
+  behavioral
+  general
+}
+
+enum ApplicationStatus {
+  draft
+  applied
+  interviewing
+  rejected
+  offer
+}
+
+enum FieldKind {
+  structured
+  open_ended
+}
+
+enum JobSource {
+  jsearch
+  adzuna
+  seed
+  jobspy
+}
+
+enum JobSite {
+  linkedin
+  indeed
+  glassdoor
+  google
+  zip_recruiter
+  bayt
+  bdjobs
+  greenhouse
+  lever
+  ashby
+  rippling
+}
+
+enum JobSubscriptionStatus {
+  idle
+  running
+  success
+  failed
+}
+
+enum JobRunStatus {
+  running
+  success
+  failed
+}
+
+model User {
+  id               String            @id @default(cuid())
+  email            String            @unique
+  passwordHash     String
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  profile          Profile?
+  educations       Education[]
+  experiences      Experience[]
+  stories          StoryItem[]
+  applications     Application[]
+  jobMatches       JobMatch[]
+  answerMemories   AnswerMemory[]
+  jobSubscriptions JobSubscription[]
+}
+
+model Profile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  fullName        String?
+  phone           String?
+  location        String?
+  school          String?
+  degree          String?
+  graduationYear  Int?
+  linkedinUrl     String?
+  githubUrl       String?
+  portfolioUrl    String?
+  visaStatus      String?
+  preferredRoles  String[]
+  preferredCities String[]
+  skills          String[]
+  summary         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Education {
+  id           String    @id @default(cuid())
+  userId       String
+  school       String
+  degree       String
+  fieldOfStudy String?
+  startDate    DateTime?
+  endDate      DateTime?
+  description  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Experience {
+  id          String    @id @default(cuid())
+  userId      String
+  title       String
+  company     String?
+  location    String?
+  description String
+  highlights  String[]
+  skills      String[]
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model StoryItem {
+  id         String        @id @default(cuid())
+  userId     String
+  title      String
+  category   StoryCategory
+  promptTags String[]
+  situation  String
+  task       String?
+  action     String
+  result     String
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Application {
+  id              String            @id @default(cuid())
+  userId          String
+  company         String
+  role            String
+  jobUrl          String?
+  status          ApplicationStatus @default(draft)
+  source          String?
+  notes           String?
+  autofillPayload Json?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Job {
+  id             String     @id @default(cuid())
+  externalId     String?
+  source         JobSource
+  sourceSite     JobSite?
+  sourceQuery    String?
+  company        String
+  companyUrl     String?
+  title          String
+  location       String?
+  city           String?
+  state          String?
+  country        String?
+  isRemote       Boolean?
+  applyUrl       String
+  description    String?
+  skills         String[]
+  jobType        String?
+  jobLevel       String?
+  salaryMin      Int?
+  salaryMax      Int?
+  salaryCurrency String?
+  salaryInterval String?
+  rawPayload     Json?
+  postedAt       DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  matches        JobMatch[]
+
+  @@unique([source, applyUrl])
+}
+
+model JobMatch {
+  id        String   @id @default(cuid())
+  userId    String
+  jobId     String
+  score     Float
+  reasons   String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobId])
+}
+
+model AnswerMemory {
+  id           String   @id @default(cuid())
+  userId       String
+  questionHash String
+  companyKey   String
+  roleKey      String
+  question     String
+  answer       String
+  hitCount     Int      @default(0)
+  lastUsedAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionHash, companyKey, roleKey])
+  @@index([userId, updatedAt])
+}
+
+model JobSubscription {
+  id              String                @id @default(cuid())
+  userId          String
+  name            String
+  enabled         Boolean               @default(true)
+  keywords        String[]
+  locations       String[]
+  isRemote        Boolean?
+  jobTypes        String[]
+  sites           JobSite[]
+  countryIndeed   String?
+  hoursOld        Int?
+  resultsWanted   Int                   @default(50)
+  runEveryMinutes Int                   @default(60)
+  lastRunAt       DateTime?
+  nextRunAt       DateTime?
+  lastStatus      JobSubscriptionStatus @default(idle)
+  lastError       String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  runs            JobIngestionRun[]
+
+  @@index([userId])
+  @@index([enabled, nextRunAt])
+}
+
+model JobIngestionRun {
+  id             String          @id @default(cuid())
+  subscriptionId String
+  status         JobRunStatus
+  startedAt      DateTime        @default(now())
+  finishedAt     DateTime?
+  fetchedCount   Int             @default(0)
+  insertedCount  Int             @default(0)
+  updatedCount   Int             @default(0)
+  matchedCount   Int             @default(0)
+  errorMessage   String?
+  meta           Json?
+  subscription   JobSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId, startedAt])
+}
