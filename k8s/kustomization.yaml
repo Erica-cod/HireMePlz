@@ -20,6 +20,11 @@ resources:
   - frontend/service.yaml
   - worker/deployment.yaml
   - worker-llm/deployment.yaml
+  # Monitoring
+  - monitoring/prometheus.yaml
+  - monitoring/grafana.yaml
+  - monitoring/loki.yaml
+  - monitoring/promtail.yaml
   # Autoscaling
   - hpa.yaml
   # Availability

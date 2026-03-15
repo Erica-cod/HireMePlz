@@ -15,6 +15,7 @@ spec:
     - hosts:
         - hiremeplz.example.com
         - api.hiremeplz.example.com
+        - grafana.hiremeplz.example.com
       secretName: hiremeplz-tls
   rules:
     # Frontend: hiremeplz.example.com
@@ -39,3 +40,14 @@ spec:
                 name: backend-svc
                 port:
                   number: 4000
+    # Grafana dashboard: grafana.hiremeplz.example.com
+    - host: grafana.hiremeplz.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana-svc
+                port:
+                  number: 3000

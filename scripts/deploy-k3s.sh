@@ -154,8 +154,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 K8S_DIR="$(cd "$SCRIPT_DIR/../k8s" && pwd)"
 
 # Replace Ingress domain names
+GRAFANA_DOMAIN="${GRAFANA_DOMAIN:-grafana.${DOMAIN}}"
 sed -i "s|hiremeplz.example.com|${DOMAIN}|g" "$K8S_DIR/ingress.yaml"
 sed -i "s|api.hiremeplz.example.com|${API_DOMAIN}|g" "$K8S_DIR/ingress.yaml"
+sed -i "s|grafana.hiremeplz.example.com|${GRAFANA_DOMAIN}|g" "$K8S_DIR/ingress.yaml"
 
 # Replace ConfigMap API URL
 sed -i "s|https://api.hiremeplz.example.com|https://${API_DOMAIN}|g" "$K8S_DIR/configmap.yaml"
@@ -210,6 +212,16 @@ kubectl wait --namespace hiremeplz \
   --selector=app.kubernetes.io/name=frontend \
   --timeout=120s
 
+kubectl wait --namespace hiremeplz \
+  --for=condition=ready pod \
+  --selector=app.kubernetes.io/name=prometheus \
+  --timeout=120s
+
+kubectl wait --namespace hiremeplz \
+  --for=condition=ready pod \
+  --selector=app.kubernetes.io/name=grafana \
+  --timeout=120s
+
 # ========================================
 # Done
 # ========================================
@@ -222,8 +234,9 @@ kubectl get all -n hiremeplz
 echo ""
 echo "----------------------------------------------"
 echo "Configure DNS (A records):"
-echo "  ${DOMAIN}       -> ${SERVER_IP}"
-echo "  ${API_DOMAIN}   -> ${SERVER_IP}"
+echo "  ${DOMAIN}            -> ${SERVER_IP}"
+echo "  ${API_DOMAIN}        -> ${SERVER_IP}"
+echo "  ${GRAFANA_DOMAIN}    -> ${SERVER_IP}  (Grafana dashboard)"
 echo ""
 echo "TLS certificates will be auto-provisioned by cert-manager once DNS propagates."
 echo "----------------------------------------------"
