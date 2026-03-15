@@ -128,6 +128,11 @@ function showFloatingButton(fieldCount: number): void {
   btn.addEventListener("click", () => showPreviewPanel());
 }
 
+function clearExtensionUi(): void {
+  document.getElementById("hiremeplz-fab")?.remove();
+  document.getElementById("hiremeplz-panel")?.remove();
+}
+
 function escapeHtml(str: string): string {
   const div = document.createElement("div");
   div.textContent = str;
@@ -422,3 +427,18 @@ if (document.readyState === "loading") {
 } else {
   void initWithRetry();
 }
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "local") {
+    return;
+  }
+
+  if (
+    changes["hiremeplz-token"] ||
+    changes["hiremeplz-api-url"]
+  ) {
+    matchResults = [];
+    clearExtensionUi();
+    void initWithRetry();
+  }
+});

@@ -7,9 +7,9 @@ mkdirSync("dist", { recursive: true });
 copyFileSync("src/panel.css", "dist/panel.css");
 
 const ctx = await context({
-  entryPoints: ["src/content.ts"],
+  entryPoints: ["src/content.ts", "src/popup.ts"],
   bundle: true,
-  outfile: "dist/content.js",
+  outdir: "dist",
   format: "iife",
   target: "chrome120",
   sourcemap: true
