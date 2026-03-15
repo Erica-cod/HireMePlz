@@ -2,9 +2,10 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { AuthGate } from "../../../components/auth-gate";
-import { apiRequest, splitCommaText } from "../../../lib/api";
+import { apiRequest } from "../../../lib/api";
+import { TagInput } from "../../../components/tag-input";
 import type { Education, UserProfile } from "../../../types";
 
 const emptyProfile: UserProfile = {
@@ -28,15 +29,6 @@ function ProfileContent({ token }: { token: string }) {
   const [skillInput, setSkillInput] = useState("");
   const [editing, setEditing] = useState(false);
 
-  const roleText = useMemo(
-    () => profile.preferredRoles.join(", "),
-    [profile.preferredRoles]
-  );
-  const cityText = useMemo(
-    () => profile.preferredCities.join(", "),
-    [profile.preferredCities]
-  );
-
   useEffect(() => {
     apiRequest<{ profile: UserProfile | null; educations: Education[] }>(
       "/profile",
@@ -52,11 +44,7 @@ function ProfileContent({ token }: { token: string }) {
   async function saveProfile() {
     setSaving(true);
     try {
-      const payload = {
-        ...profile,
-        preferredRoles: splitCommaText(roleText),
-        preferredCities: splitCommaText(cityText),
-      };
+      const payload = { ...profile };
       const data = await apiRequest<{ profile: UserProfile }>("/profile", {
         method: "PUT",
         token,
@@ -87,24 +75,57 @@ function ProfileContent({ token }: { token: string }) {
     });
   }
 
-  async function addEducation() {
+  const [editingEdu, setEditingEdu] = useState<Partial<Education> | null>(null);
+  const [isNewEdu, setIsNewEdu] = useState(false);
+
+  function startNewEdu() {
+    setEditingEdu({ school: "", degree: "", fieldOfStudy: "", description: "" });
+    setIsNewEdu(true);
+  }
+
+  function startEditEdu(edu: Education) {
+    setEditingEdu({ ...edu });
+    setIsNewEdu(false);
+  }
+
+  const [eduError, setEduError] = useState("");
+
+  async function saveEdu() {
+    if (!editingEdu) return;
+    if (!editingEdu.school?.trim() || !editingEdu.degree?.trim()) {
+      setEduError("Please fill in School and Degree.");
+      return;
+    }
+    setEduError("");
     try {
-      const data = await apiRequest<{ education: Education }>(
-        "/profile/educations",
-        {
-          method: "POST",
-          token,
-          body: {
-            school: "University of Toronto",
-            degree: "MEng",
-            fieldOfStudy: "ECE",
-            description: "Edit this education record.",
-          },
-        }
-      );
-      setEducations((current) => [data.education, ...current]);
+      if (isNewEdu) {
+        const data = await apiRequest<{ education: Education }>(
+          "/profile/educations",
+          { method: "POST", token, body: editingEdu }
+        );
+        setEducations((current) => [data.education, ...current]);
+      } else {
+        const data = await apiRequest<{ education: Education }>(
+          `/profile/educations/${editingEdu.id}`,
+          { method: "PUT", token, body: editingEdu }
+        );
+        setEducations((current) =>
+          current.map((e) => (e.id === data.education.id ? data.education : e))
+        );
+      }
+      setEditingEdu(null);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Create failed");
+      setMessage(error instanceof Error ? error.message : "Save failed");
+    }
+  }
+
+  async function deleteEdu(id: string) {
+    if (!confirm("Delete this education record?")) return;
+    try {
+      await apiRequest(`/profile/educations/${id}`, { method: "DELETE", token });
+      setEducations((current) => current.filter((e) => e.id !== id));
+    } catch {
+      setMessage("Failed to delete");
     }
   }
 
@@ -249,15 +270,33 @@ function ProfileContent({ token }: { token: string }) {
             <div className="space-y-3">
               {educations.map((edu) => (
                 <div key={edu.id} className="border rounded-lg p-4">
-                  <p className="font-medium">
-                    {edu.school} / {edu.degree}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {edu.fieldOfStudy || "No major provided"}
-                  </p>
-                  <p className="text-sm text-gray-400">
-                    {edu.description || "No description"}
-                  </p>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-medium">
+                        {edu.school} / {edu.degree}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {edu.fieldOfStudy || "No major provided"}
+                      </p>
+                      <p className="text-sm text-gray-400">
+                        {edu.description || "No description"}
+                      </p>
+                    </div>
+                    <div className="flex gap-2 ml-4 shrink-0">
+                      <button
+                        onClick={() => { setEditing(true); startEditEdu(edu); }}
+                        className="text-sm text-blue-600 hover:underline"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => deleteEdu(edu.id)}
+                        className="text-sm text-red-600 hover:underline"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -413,70 +452,138 @@ function ProfileContent({ token }: { token: string }) {
 
       <section className="rounded-xl border bg-white p-6 shadow-sm mb-6">
         <h2 className="text-lg font-semibold mb-4">Preferences</h2>
-        <div className="grid grid-cols-1 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Target roles (comma separated)
-            </label>
-            <input
-              type="text"
-              defaultValue={roleText}
-              onBlur={(e) =>
-                setProfile({
-                  ...profile,
-                  preferredRoles: splitCommaText(e.target.value),
-                })
-              }
-              className="w-full rounded-lg border px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Target cities (comma separated)
-            </label>
-            <input
-              type="text"
-              defaultValue={cityText}
-              onBlur={(e) =>
-                setProfile({
-                  ...profile,
-                  preferredCities: splitCommaText(e.target.value),
-                })
-              }
-              className="w-full rounded-lg border px-3 py-2 text-sm"
-            />
-          </div>
+        <div className="space-y-4">
+          <TagInput
+            label="Target Roles"
+            tags={profile.preferredRoles}
+            onChange={(preferredRoles) => setProfile({ ...profile, preferredRoles })}
+            placeholder="e.g. Software Engineer"
+          />
+          <TagInput
+            label="Target Cities"
+            tags={profile.preferredCities}
+            onChange={(preferredCities) => setProfile({ ...profile, preferredCities })}
+            placeholder="e.g. Toronto"
+          />
         </div>
       </section>
 
       <section className="rounded-xl border bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Education</h2>
-          <button
-            onClick={addEducation}
-            className="rounded-lg bg-gray-200 px-4 py-2 text-sm hover:bg-gray-300"
-          >
-            + Add Education
-          </button>
+          {!editingEdu && (
+            <button
+              onClick={startNewEdu}
+              className="rounded-lg bg-gray-200 px-4 py-2 text-sm hover:bg-gray-300"
+            >
+              + Add Education
+            </button>
+          )}
         </div>
-        {educations.length === 0 ? (
+
+        {editingEdu && (
+          <div className="border rounded-lg p-4 mb-4 bg-gray-50">
+            <h3 className="text-sm font-semibold mb-3">
+              {isNewEdu ? "New Education" : "Edit Education"}
+            </h3>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">School <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    value={editingEdu.school || ""}
+                    onChange={(e) => setEditingEdu({ ...editingEdu, school: e.target.value })}
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Degree <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    value={editingEdu.degree || ""}
+                    onChange={(e) => setEditingEdu({ ...editingEdu, degree: e.target.value })}
+                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Field of Study <span className="text-gray-400 font-normal">(optional)</span></label>
+                <input
+                  type="text"
+                  value={editingEdu.fieldOfStudy || ""}
+                  onChange={(e) => setEditingEdu({ ...editingEdu, fieldOfStudy: e.target.value })}
+                  className="w-full rounded-lg border px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Description <span className="text-gray-400 font-normal">(optional)</span></label>
+                <textarea
+                  value={editingEdu.description || ""}
+                  onChange={(e) => setEditingEdu({ ...editingEdu, description: e.target.value })}
+                  rows={2}
+                  className="w-full rounded-lg border px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={saveEdu}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => { setEditingEdu(null); setEduError(""); }}
+                  className="rounded-lg border px-4 py-2 text-sm hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                {eduError && (
+                  <span className="text-red-500 text-sm">{eduError}</span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {educations.length === 0 && !editingEdu ? (
           <p className="text-gray-500 text-sm">
             No education records yet. Add at least one to improve autofill
             quality.
           </p>
         ) : (
           <div className="space-y-3">
-            {educations.map((edu) => (
+            {educations
+              .filter((edu) => !editingEdu || editingEdu.id !== edu.id)
+              .map((edu) => (
               <div key={edu.id} className="border rounded-lg p-4">
-                <p className="font-medium">
-                  {edu.school} / {edu.degree}
-                </p>
-                <p className="text-sm text-gray-500">
-                  {edu.fieldOfStudy || "No major provided"}
-                </p>
-                <p className="text-sm text-gray-400">
-                  {edu.description || "No description"}
-                </p>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-medium">
+                      {edu.school} / {edu.degree}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {edu.fieldOfStudy || "No major provided"}
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      {edu.description || "No description"}
+                    </p>
+                  </div>
+                  <div className="flex gap-2 ml-4 shrink-0">
+                    <button
+                      onClick={() => startEditEdu(edu)}
+                      className="text-sm text-blue-600 hover:underline"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => deleteEdu(edu.id)}
+                      className="text-sm text-red-600 hover:underline"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
