@@ -431,8 +431,35 @@ async function initWithRetry(attempts = 5, delay = 1500): Promise<void> {
   }
 }
 
+async function syncTokenFromFrontend() {
+  const host = window.location.hostname;
+  if (host !== "localhost" && !host.endsWith(".hiremeplz.com")) return;
+
+  const token = window.localStorage.getItem("hiremeplz-token");
+  if (!token) return;
+
+  const stored = await chrome.storage.local.get("hiremeplz-token");
+  if (stored["hiremeplz-token"] === token) return;
+
+  const apiUrl =
+    window.location.port === "3000"
+      ? `${window.location.protocol}//${host}:4000`
+      : `${window.location.protocol}//${host}`;
+
+  await chrome.storage.local.set({
+    "hiremeplz-token": token,
+    "hiremeplz-api-url": apiUrl,
+    "hiremeplz-email": "(synced from web)",
+  });
+  console.log("[HireMePlz] Token synced from frontend");
+}
+
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => void initWithRetry());
+  document.addEventListener("DOMContentLoaded", () => {
+    void syncTokenFromFrontend();
+    void initWithRetry();
+  });
 } else {
+  void syncTokenFromFrontend();
   void initWithRetry();
 }
