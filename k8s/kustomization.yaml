@@ -7,19 +7,26 @@ resources:
   - namespace.yaml
   - configmap.yaml
   - secret.yaml
-  # 基础设施
+  - resource-quota.yaml
+  # Infrastructure
   - postgres/statefulset.yaml
   - postgres/service.yaml
   - redis/deployment.yaml
   - redis/service.yaml
-  # 应用服务
+  # Application services
   - backend/deployment.yaml
   - backend/service.yaml
   - frontend/deployment.yaml
   - frontend/service.yaml
   - worker/deployment.yaml
   - worker-llm/deployment.yaml
-  # 入口
+  # Autoscaling
+  - hpa.yaml
+  # Availability
+  - pdb.yaml
+  # Network security
+  - network-policy.yaml
+  # Ingress
   - ingress.yaml
 
 labels:

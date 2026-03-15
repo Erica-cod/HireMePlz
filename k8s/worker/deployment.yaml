@@ -18,6 +18,8 @@ spec:
         app.kubernetes.io/name: worker
         app.kubernetes.io/component: scraper
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: worker
           image: ghcr.io/erica-cod/hiremeplz/worker:latest

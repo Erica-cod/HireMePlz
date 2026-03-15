@@ -8,10 +8,16 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
   ingressClassName: nginx
+  tls:
+    - hosts:
+        - hiremeplz.example.com
+        - api.hiremeplz.example.com
+      secretName: hiremeplz-tls
   rules:
-    # 前端: hiremeplz.example.com
+    # Frontend: hiremeplz.example.com
     - host: hiremeplz.example.com
       http:
         paths:
@@ -22,7 +28,7 @@ spec:
                 name: frontend-svc
                 port:
                   number: 3000
-    # 后端 API: api.hiremeplz.example.com
+    # Backend API: api.hiremeplz.example.com
     - host: api.hiremeplz.example.com
       http:
         paths:
@@ -33,9 +39,3 @@ spec:
                 name: backend-svc
                 port:
                   number: 4000
-  # 生产环境取消注释并配置 TLS
-  # tls:
-  #   - hosts:
-  #       - hiremeplz.example.com
-  #       - api.hiremeplz.example.com
-  #     secretName: hiremeplz-tls
