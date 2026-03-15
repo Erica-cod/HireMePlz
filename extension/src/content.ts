@@ -49,6 +49,7 @@ const MOCK_PROFILE: Record<string, unknown> = {
 // ===================================
 
 let matchResults: MatchResult[] = [];
+let apiError = "";
 let autofillContext: { company: string; role: string } = {
   company: "",
   role: "",
@@ -108,18 +109,19 @@ async function init(): Promise<void> {
     if (!token) return;
 
     autofillContext = inferAutofillContext();
+    apiError = "";
     const suggestions = await requestSuggestions(fields, apiUrl, token);
     matchResults = toMatchResults(fields, suggestions);
   }
 
-  if (matchResults.length === 0) return;
+  if (matchResults.length === 0 && !apiError) return;
 
   // In mock mode we still emulate delayed LLM completion.
   if (MOCK_MODE && matchResults.some((r) => r.source === "llm_pending")) {
     await fetchLLMAnswers();
   }
 
-  showFloatingButton(matchResults.length);
+  showFloatingButton(matchResults.length, !!apiError);
 }
 
 async function getStorageValue(key: string, fallback = ""): Promise<string> {
@@ -127,14 +129,15 @@ async function getStorageValue(key: string, fallback = ""): Promise<string> {
   return (result[key] as string | undefined) ?? fallback;
 }
 
-function showFloatingButton(fieldCount: number): void {
+function showFloatingButton(fieldCount: number, hasError = false): void {
   document.getElementById("hiremeplz-fab")?.remove();
 
   const btn = document.createElement("div");
   btn.id = "hiremeplz-fab";
+  const label = hasError ? "HireMePlz ⚠" : "HireMePlz";
   btn.innerHTML = `
-    <div id="hiremeplz-fab-btn">
-      <span>HireMePlz</span>
+    <div id="hiremeplz-fab-btn" ${hasError ? 'style="background:#dc2626"' : ""}>
+      <span>${label}</span>
       <span class="hiremeplz-badge">${fieldCount}</span>
     </div>
   `;
@@ -177,11 +180,18 @@ function showPreviewPanel(): void {
     })
     .join("");
 
+  const errorBanner = apiError
+    ? `<div style="background:#fef2f2;color:#991b1b;padding:10px 16px;font-size:12px;border-bottom:1px solid #fecaca;">
+        ⚠ ${escapeHtml(apiError)}
+      </div>`
+    : "";
+
   panel.innerHTML = `
     <div class="hiremeplz-panel-header">
       <span>HireMePlz — Preview</span>
       <button id="hiremeplz-close">&times;</button>
     </div>
+    ${errorBanner}
     <div class="hiremeplz-panel-body">${fieldsHtml}</div>
     <div class="hiremeplz-panel-footer">
       <button id="hiremeplz-fill-btn">Fill All</button>
@@ -322,6 +332,8 @@ async function requestSuggestions(
       })),
     };
 
+    console.log(`[HireMePlz] Requesting suggestions for ${fields.length} fields from ${apiUrl}`);
+
     const res = await fetch(`${apiUrl}/api/autofill/suggestions`, {
       method: "POST",
       headers: {
@@ -331,10 +343,25 @@ async function requestSuggestions(
       body: JSON.stringify(payload),
     });
 
-    if (!res.ok) return [];
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => "");
+      console.error(`[HireMePlz] API error ${res.status}: ${errorText}`);
+      if (res.status === 401) {
+        apiError = "Token expired — please re-login via extension popup";
+        await chrome.storage.local.remove(["hiremeplz-token", "hiremeplz-email"]);
+      } else {
+        apiError = `Server error (${res.status})`;
+      }
+      return [];
+    }
+
     const data = (await res.json()) as { suggestions?: BackendSuggestion[] };
-    return data.suggestions ?? [];
-  } catch {
+    const suggestions = data.suggestions ?? [];
+    console.log(`[HireMePlz] Received ${suggestions.length} suggestions`);
+    return suggestions;
+  } catch (err) {
+    console.error("[HireMePlz] Request failed:", err);
+    apiError = "Cannot reach server — check if backend is running";
     return [];
   }
 }
