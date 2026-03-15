@@ -22,7 +22,10 @@ export type LlmJobResult = {
 };
 
 const openai = llmEnv.openaiApiKey
-  ? new OpenAI({ apiKey: llmEnv.openaiApiKey })
+  ? new OpenAI({
+      apiKey: llmEnv.openaiApiKey,
+      ...(llmEnv.openaiBaseUrl && { baseURL: llmEnv.openaiBaseUrl }),
+    })
   : null;
 
 function buildFallbackAnswer(
@@ -65,9 +68,6 @@ export async function processAutofillJob(
   }
 
   const prompt = [
-    "You are a job application assistant.",
-    "Generate an English answer suitable for a software engineering application form using the user's experience details.",
-    "Requirements: natural, specific, not exaggerated, and around 120 to 180 words.",
     `Role: ${role || "Not provided"}`,
     `Company: ${company || "Not provided"}`,
     `Question: ${question}`,
@@ -78,15 +78,18 @@ export async function processAutofillJob(
     `Result: ${story?.result || "Not provided"}`
   ].join("\n");
 
-  console.log(`[worker-llm] Calling OpenAI for job ${job.id}`);
+  console.log(`[worker-llm] Calling LLM for job ${job.id}`);
 
-  const completion = await openai.responses.create({
+  const completion = await openai.chat.completions.create({
     model: llmEnv.openaiModel,
-    input: prompt
+    messages: [
+      { role: "system", content: "You are a job application assistant. Generate an English answer suitable for a software engineering application form using the user's experience details. Requirements: natural, specific, not exaggerated, and around 120 to 180 words." },
+      { role: "user", content: prompt },
+    ],
   });
 
-  const answer = completion.output_text.trim();
-  console.log(`[worker-llm] OpenAI returned ${answer.length} chars for job ${job.id}`);
+  const answer = (completion.choices[0]?.message?.content ?? "").trim();
+  console.log(`[worker-llm] LLM returned ${answer.length} chars for job ${job.id}`);
 
   return { answer };
 }
