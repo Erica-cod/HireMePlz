@@ -1,4 +1,3 @@
-import { StoryCategory } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
 
@@ -13,12 +12,8 @@ const router = Router();
 
 const storySchema = z.object({
   title: z.string().min(1),
-  category: z.nativeEnum(StoryCategory),
-  promptTags: z.array(z.string()).default([]),
-  situation: z.string().min(1),
-  task: z.string().optional().nullable(),
-  action: z.string().min(1),
-  result: z.string().min(1)
+  tags: z.array(z.string()).default([]),
+  content: z.string().min(1)
 });
 
 router.get(
