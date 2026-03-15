@@ -31,6 +31,8 @@ const runsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20)
 });
 
+const AUTO_SUBSCRIPTION_NAME = "Profile Auto Subscription";
+
 function normalizeStringList(values: string[]) {
   return Array.from(
     new Set(values.map((value) => value.trim()).filter((value) => value.length > 0))
@@ -121,10 +123,104 @@ async function findOwnedSubscription(subscriptionId: string, userId: string) {
   });
 }
 
+function inferCountryIndeedFromProfileLocation(location: string | null | undefined) {
+  if (!location) {
+    return "USA";
+  }
+
+  const normalized = location.toLowerCase();
+  if (
+    normalized.includes("canada") ||
+    normalized.includes("toronto") ||
+    normalized.includes("vancouver") ||
+    normalized.includes("montreal") ||
+    normalized.includes("ottawa")
+  ) {
+    return "Canada";
+  }
+
+  return "USA";
+}
+
+function buildProfileDrivenSubscription(profile: {
+  preferredRoles: string[];
+  preferredCities: string[];
+  skills: string[];
+  location: string | null;
+}) {
+  const preferredRoles = normalizeStringList(profile.preferredRoles);
+  const preferredCities = normalizeStringList(profile.preferredCities);
+  const skills = normalizeStringList(profile.skills);
+
+  const keywordCandidates = preferredRoles.length > 0 ? preferredRoles : skills;
+  const keywords = keywordCandidates.slice(0, 3);
+  const locations =
+    preferredCities.length > 0
+      ? preferredCities.slice(0, 5)
+      : profile.location
+      ? [profile.location]
+      : [];
+
+  if (keywords.length === 0) {
+    return null;
+  }
+
+  return {
+    name: AUTO_SUBSCRIPTION_NAME,
+    enabled: true,
+    keywords,
+    locations,
+    isRemote: null,
+    jobTypes: [],
+    sites: [JobSite.indeed],
+    countryIndeed: inferCountryIndeedFromProfileLocation(profile.location),
+    hoursOld: 72,
+    resultsWanted: 30,
+    runEveryMinutes: 60
+  };
+}
+
+async function ensureAutoSubscriptionFromProfile(userId: string) {
+  const existing = await prisma.jobSubscription.findFirst({
+    where: { userId, name: AUTO_SUBSCRIPTION_NAME }
+  });
+
+  if (existing) {
+    return existing;
+  }
+
+  const profile = await prisma.profile.findUnique({
+    where: { userId },
+    select: {
+      preferredRoles: true,
+      preferredCities: true,
+      skills: true,
+      location: true
+    }
+  });
+
+  if (!profile) {
+    return null;
+  }
+
+  const payload = buildProfileDrivenSubscription(profile);
+  if (!payload) {
+    return null;
+  }
+
+  return prisma.jobSubscription.create({
+    data: {
+      ...buildCreateSubscriptionData(userId, payload)
+    }
+  });
+}
+
 router.get(
   "/recommendations",
   requireAuth,
   asyncHandler(async (request: AuthenticatedRequest, response) => {
+    await ensureAutoSubscriptionFromProfile(request.userId!);
+
     const matches = await prisma.jobMatch.findMany({
       where: { userId: request.userId },
       include: { job: true },
@@ -167,6 +263,61 @@ router.post(
 
     response.status(201).json({ subscription });
   }
+);
+
+router.post(
+  "/subscriptions/bootstrap",
+  requireAuth,
+  asyncHandler(async (request: AuthenticatedRequest, response) => {
+    const profile = await prisma.profile.findUnique({
+      where: { userId: request.userId },
+      select: {
+        preferredRoles: true,
+        preferredCities: true,
+        skills: true,
+        location: true
+      }
+    });
+
+    if (!profile) {
+      response.status(404).json({ message: "Profile not found" });
+      return;
+    }
+
+    const payload = buildProfileDrivenSubscription(profile);
+    if (!payload) {
+      response.status(400).json({
+        message:
+          "Please fill in preferred roles or skills in your profile before bootstrapping job subscriptions"
+      });
+      return;
+    }
+
+    const existing = await prisma.jobSubscription.findFirst({
+      where: {
+        userId: request.userId,
+        name: AUTO_SUBSCRIPTION_NAME
+      }
+    });
+
+    if (!existing) {
+      const subscription = await prisma.jobSubscription.create({
+        data: {
+          ...buildCreateSubscriptionData(request.userId!, payload)
+        }
+      });
+
+      response.status(201).json({ subscription, mode: "created" });
+      return;
+    }
+
+    const subscription = await prisma.jobSubscription.update({
+      where: { id: existing.id },
+      data: buildUpdateSubscriptionData(payload, existing)
+    });
+
+    response.json({ subscription, mode: "updated" });
+  })
 );
 
 router.put(
