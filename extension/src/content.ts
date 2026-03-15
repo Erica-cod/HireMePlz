@@ -70,9 +70,23 @@ function isApplicationPage(): boolean {
     "lever.co",
     "workday.com",
     "myworkdayjobs.com",
+    "icims.com",
+    "smartrecruiters.com",
+    "jobvite.com",
+    "ashbyhq.com",
+    "breezy.hr",
+    "recruitee.com",
+    "taleo.net",
+    "successfactors.com",
+    "amazon.jobs",
+    "jobs.lever.co",
+    "boards.greenhouse.io",
     "apply",
     "application",
     "career",
+    "jobs",
+    "hiring",
+    "recruit",
   ];
   return patterns.some((p) => url.includes(p));
 }

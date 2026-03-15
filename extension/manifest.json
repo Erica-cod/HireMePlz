@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "HireMePlz Autofill",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Scan job application form fields and fetch smart suggestions from the HireMePlz backend.",
   "permissions": [
     "storage"
@@ -9,6 +9,10 @@
   "host_permissions": [
     "<all_urls>"
   ],
+  "action": {
+    "default_popup": "dist/popup.html",
+    "default_title": "HireMePlz Autofill"
+  },
   "content_scripts": [
     {
       "matches": [
