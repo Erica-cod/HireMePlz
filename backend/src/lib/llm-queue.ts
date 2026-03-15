@@ -10,10 +10,7 @@ export type LlmJobData = {
   role?: string;
   story: {
     title: string;
-    situation: string;
-    task: string | null;
-    action: string;
-    result: string;
+    content: string;
   } | null;
   experiences: Array<{ title: string; description: string }>;
   selectOptions?: string[];
