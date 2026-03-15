@@ -1,124 +1,158 @@
-const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+const $ = (id: string) => document.getElementById(id)!;
 
-const emailInput = $<HTMLInputElement>("email");
-const passwordInput = $<HTMLInputElement>("password");
-const loginBtn = $<HTMLButtonElement>("login-btn");
-const loginError = $("login-error");
-const apiUrlInput = $<HTMLInputElement>("api-url");
-const tokenInput = $<HTMLInputElement>("token");
-const saveBtn = $<HTMLButtonElement>("save-btn");
-const statusBar = $("status-bar");
-const statusText = $("status-text");
 const loginView = $("login-view");
-const loggedInView = $("logged-in-view");
+const loggedInView = $("logged-in-view") as HTMLElement;
+const nameLabel = $("name-label") as HTMLElement;
+const nameInput = $("name") as HTMLInputElement;
+const emailInput = $("email") as HTMLInputElement;
+const passwordInput = $("password") as HTMLInputElement;
+const loginBtn = $("login-btn") as HTMLButtonElement;
+const loginMsg = $("login-msg") as HTMLElement;
+const authToggleBtn = $("auth-toggle-btn") as HTMLButtonElement;
 const userEmail = $("user-email");
-const displayApiUrl = $("display-api-url");
-const logoutBtn = $<HTMLButtonElement>("logout-btn");
+const apiUrlInput = $("api-url") as HTMLInputElement;
+const serverStatus = $("server-status");
+const saveSettingsBtn = $("save-settings-btn");
+const logoutBtn = $("logout-btn");
+const settingsMsg = $("settings-msg");
 
-async function getVal(key: string, fallback = ""): Promise<string> {
+let authMode: "login" | "register" = "login";
+
+async function getStorage<T>(key: string, fallback: T): Promise<T> {
   const result = await chrome.storage.local.get(key);
-  return (result[key] as string | undefined) ?? fallback;
+  return (result[key] as T) ?? fallback;
 }
 
-async function setVal(key: string, value: string) {
-  await chrome.storage.local.set({ [key]: value });
+async function setStorage(data: Record<string, unknown>) {
+  await chrome.storage.local.set(data);
 }
 
-function setStatus(connected: boolean, text: string) {
-  statusBar.className = `status-bar ${connected ? "connected" : "disconnected"}`;
-  statusText.textContent = text;
+function showMsg(el: HTMLElement, text: string, type: "error" | "success") {
+  el.className = `msg msg-${type}`;
+  el.textContent = text;
+  setTimeout(() => { el.textContent = ""; el.className = ""; }, 3000);
 }
 
-function showError(msg: string) {
-  loginError.textContent = msg;
-  loginError.style.display = "block";
-}
-
-function hideError() {
-  loginError.style.display = "none";
-}
-
-async function checkState() {
-  const apiUrl = await getVal("hiremeplz-api-url", "http://localhost:4000");
-  const token = await getVal("hiremeplz-token");
-  const email = await getVal("hiremeplz-email");
-
-  apiUrlInput.value = apiUrl;
-
-  if (token) {
-    setStatus(true, "Connected");
-    loginView.style.display = "none";
-    loggedInView.style.display = "block";
-    userEmail.textContent = email || "Token configured";
-    displayApiUrl.textContent = apiUrl;
-  } else {
-    setStatus(false, "Not connected");
-    loginView.style.display = "block";
-    loggedInView.style.display = "none";
+async function checkServer(apiUrl: string) {
+  try {
+    const res = await fetch(`${apiUrl}/api/health`, { signal: AbortSignal.timeout(3000) });
+    if (res.ok) {
+      serverStatus.innerHTML = '<span class="status-dot green"></span> Server connected';
+    } else {
+      serverStatus.innerHTML = '<span class="status-dot red"></span> Server returned error';
+    }
+  } catch {
+    serverStatus.innerHTML = '<span class="status-dot red"></span> Cannot reach server';
   }
 }
 
-loginBtn.addEventListener("click", async () => {
-  hideError();
+async function init() {
+  const token = await getStorage("hiremeplz-token", "");
+  const email = await getStorage("hiremeplz-email", "");
+  const apiUrl = await getStorage("hiremeplz-api-url", "http://localhost:4000");
+
+  apiUrlInput.value = apiUrl;
+  checkServer(apiUrl);
+
+  if (token) {
+    loginView.style.display = "none";
+    loggedInView.style.display = "block";
+    userEmail.textContent = email || "Logged in";
+  } else {
+    loginView.style.display = "block";
+    loggedInView.style.display = "none";
+    renderAuthMode();
+  }
+}
+
+function renderAuthMode() {
+  const isRegister = authMode === "register";
+  nameLabel.style.display = isRegister ? "block" : "none";
+  nameInput.style.display = isRegister ? "block" : "none";
+  loginBtn.textContent = isRegister ? "Create Account" : "Sign In";
+  authToggleBtn.textContent = isRegister ? "Back to sign in" : "Create account";
+}
+
+async function handleLogin() {
+  const name = nameInput.value.trim();
   const email = emailInput.value.trim();
   const password = passwordInput.value;
-  const apiUrl = apiUrlInput.value.trim() || "http://localhost:4000";
 
   if (!email || !password) {
-    showError("Please enter email and password");
+    showMsg(loginMsg, "Please enter email and password.", "error");
     return;
   }
 
-  loginBtn.disabled = true;
-  loginBtn.textContent = "Logging in...";
+  if (authMode === "register" && !name) {
+    showMsg(loginMsg, "Please enter your name.", "error");
+    return;
+  }
+
+  const apiUrl = await getStorage("hiremeplz-api-url", "http://localhost:4000");
 
   try {
-    const resp = await fetch(`${apiUrl}/api/auth/login`, {
+    const endpoint =
+      authMode === "register" ? `${apiUrl}/api/auth/register` : `${apiUrl}/api/auth/login`;
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(
+        authMode === "register" ? { name, email, password } : { email, password }
+      ),
     });
 
-    const data = await resp.json();
+    const data = await res.json();
 
-    if (!resp.ok) {
-      showError(data.message || "Login failed");
+    if (!res.ok) {
+      showMsg(loginMsg, data.message || "Login failed", "error");
       return;
     }
 
-    await setVal("hiremeplz-api-url", apiUrl);
-    await setVal("hiremeplz-token", data.token);
-    await setVal("hiremeplz-email", email);
-    await checkState();
+    await setStorage({
+      "hiremeplz-token": data.token,
+      "hiremeplz-email": email,
+    });
+
+    showMsg(
+      loginMsg,
+      authMode === "register" ? "Account created!" : "Logged in!",
+      "success"
+    );
+    setTimeout(() => init(), 500);
   } catch {
-    showError("Cannot reach server. Check API URL.");
-  } finally {
-    loginBtn.disabled = false;
-    loginBtn.textContent = "Login";
+    showMsg(loginMsg, "Cannot connect to server. Check API Server above.", "error");
   }
+}
+
+loginBtn.addEventListener("click", () => {
+  void handleLogin();
 });
 
-saveBtn.addEventListener("click", async () => {
+authToggleBtn.addEventListener("click", () => {
+  authMode = authMode === "login" ? "register" : "login";
+  loginMsg.textContent = "";
+  renderAuthMode();
+});
+
+[emailInput, passwordInput].forEach((input) => {
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void handleLogin();
+    }
+  });
+});
+
+saveSettingsBtn.addEventListener("click", async () => {
   const apiUrl = apiUrlInput.value.trim() || "http://localhost:4000";
-  const token = tokenInput.value.trim();
-
-  if (!token) {
-    showError("Please enter a token");
-    return;
-  }
-
-  await setVal("hiremeplz-api-url", apiUrl);
-  await setVal("hiremeplz-token", token);
-  await setVal("hiremeplz-email", "");
-  await checkState();
+  await setStorage({ "hiremeplz-api-url": apiUrl });
+  showMsg(settingsMsg, "Settings saved!", "success");
+  checkServer(apiUrl);
 });
 
 logoutBtn.addEventListener("click", async () => {
-  await chrome.storage.local.remove([
-    "hiremeplz-token",
-    "hiremeplz-email",
-  ]);
-  await checkState();
+  await chrome.storage.local.remove(["hiremeplz-token", "hiremeplz-email"]);
+  init();
 });
 
-void checkState();
+init();

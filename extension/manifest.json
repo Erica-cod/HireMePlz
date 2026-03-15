@@ -3,16 +3,25 @@
   "name": "HireMePlz Autofill",
   "version": "0.2.0",
   "description": "Scan job application form fields and fetch smart suggestions from the HireMePlz backend.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "dist/popup.html",
+    "default_title": "HireMePlz Autofill",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png"
+    }
+  },
   "permissions": [
     "storage"
   ],
   "host_permissions": [
     "<all_urls>"
   ],
-  "action": {
-    "default_popup": "dist/popup.html",
-    "default_title": "HireMePlz Autofill"
-  },
   "content_scripts": [
     {
       "matches": [
