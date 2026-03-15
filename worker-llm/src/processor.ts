@@ -159,7 +159,9 @@ export async function processAutofillJob(
     ],
   });
 
-  const answer = (completion.choices[0]?.message?.content ?? "").trim();
+  const raw = (completion.choices[0]?.message?.content ?? "").trim();
+  // For some 3rd-party LLM, remove the <think> tag from the response.
+  const answer = raw.replace(/<think>[\s\S]*?<\/think>\s*/g, "").trim();
   console.log(`[worker-llm] LLM returned ${answer.length} chars for job ${job.id}`);
 
   return { answer };
