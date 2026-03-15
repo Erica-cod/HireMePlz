@@ -8,6 +8,11 @@ metadata:
     app.kubernetes.io/part-of: hiremeplz
 spec:
   replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app.kubernetes.io/name: frontend
@@ -16,6 +21,8 @@ spec:
       labels:
         app.kubernetes.io/name: frontend
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: frontend
           image: ghcr.io/erica-cod/hiremeplz/frontend:latest
