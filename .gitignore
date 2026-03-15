@@ -10,3 +10,4 @@ backend/prisma/dev.db
 backend/prisma/dev.db-journal
 .nvmrc
 vendor-jobspy
+watchtower-config.json

@@ -135,7 +135,7 @@ services:
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ${USERPROFILE}/.docker/config.json:/config.json:ro
+      - ./watchtower-config.json:/config.json:ro
     environment:
       WATCHTOWER_POLL_INTERVAL: 60
       WATCHTOWER_CLEANUP: "true"
