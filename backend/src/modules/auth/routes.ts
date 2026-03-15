@@ -20,8 +20,12 @@ const authSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters")
 });
 
+const registerSchema = authSchema.extend({
+  name: z.string().min(1, "Name is required")
+});
+
 router.post("/register", asyncHandler(async (request, response) => {
-  const payload = authSchema.parse(request.body);
+  const payload = registerSchema.parse(request.body);
 
   const existingUser = await prisma.user.findUnique({
     where: { email: payload.email }
@@ -38,7 +42,9 @@ router.post("/register", asyncHandler(async (request, response) => {
       email: payload.email,
       passwordHash,
       profile: {
-        create: {}
+        create: {
+          fullName: payload.name.trim()
+        }
       }
     },
     include: {

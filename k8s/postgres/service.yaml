@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-svc
+  namespace: hiremeplz
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: hiremeplz
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: postgres
+  ports:
+    - port: 5432
+      targetPort: pg
+      name: pg

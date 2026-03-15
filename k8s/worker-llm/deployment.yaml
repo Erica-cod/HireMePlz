@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-llm
+  namespace: hiremeplz
+  labels:
+    app.kubernetes.io/name: worker-llm
+    app.kubernetes.io/component: llm
+    app.kubernetes.io/part-of: hiremeplz
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: worker-llm
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: worker-llm
+        app.kubernetes.io/component: llm
+    spec:
+      imagePullSecrets:
+        - name: ghcr-secret
+      containers:
+        - name: worker-llm
+          image: ghcr.io/erica-cod/hiremeplz/worker-llm:latest
+          envFrom:
+            - configMapRef:
+                name: hiremeplz-config
+            - secretRef:
+                name: hiremeplz-secret
+          env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: hiremeplz-secret
+                  key: POSTGRES_PASSWORD
+            - name: DATABASE_URL
+              value: "postgresql://postgres:$(POSTGRES_PASSWORD)@postgres-svc:5432/hiremeplz?schema=public"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

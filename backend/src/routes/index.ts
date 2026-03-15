@@ -1,6 +1,5 @@
 import { Router } from "express";
 
-import { answerMemoryRouter } from "../modules/answer-memory/routes.js";
 import { applicationRouter } from "../modules/application/routes.js";
 import { authRouter } from "../modules/auth/routes.js";
 import { autofillRouter } from "../modules/autofill/routes.js";
@@ -25,5 +24,4 @@ apiRouter.use("/experiences", experienceRouter);
 apiRouter.use("/stories", storyRouter);
 apiRouter.use("/applications", applicationRouter);
 apiRouter.use("/autofill", autofillRouter);
-apiRouter.use("/answer-memory", answerMemoryRouter);
 apiRouter.use("/jobs", jobsRouter);

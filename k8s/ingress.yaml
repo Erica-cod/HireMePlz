@@ -1,0 +1,41 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hiremeplz-ingress
+  namespace: hiremeplz
+  labels:
+    app.kubernetes.io/part-of: hiremeplz
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - hiremeplz.example.com
+        - api.hiremeplz.example.com
+      secretName: hiremeplz-tls
+  rules:
+    # Frontend: hiremeplz.example.com
+    - host: hiremeplz.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-svc
+                port:
+                  number: 3000
+    # Backend API: api.hiremeplz.example.com
+    - host: api.hiremeplz.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 4000

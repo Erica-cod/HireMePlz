@@ -18,6 +18,20 @@ services:
       retries: 10
       start_period: 5s
 
+  redis:
+    image: redis:7-alpine
+    container_name: hiremeplz-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   backend:
     build:
       context: ./backend
@@ -26,10 +40,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file:
       - ./.env
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/hiremeplz?schema=public
+      REDIS_URL: redis://redis:6379
       PORT: 4000
     ports:
       - "4000:4000"
@@ -77,10 +94,31 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file:
       - ./.env
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/hiremeplz?schema=public
+      REDIS_URL: redis://redis:6379
+      JOBSPY_FETCH_COMMAND: "python scripts/jobspy_fetch.py"
+
+  worker-llm:
+    build:
+      context: ./worker-llm
+    container_name: hiremeplz-worker-llm
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - ./.env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/hiremeplz?schema=public
+      REDIS_URL: redis://redis:6379
 
 volumes:
   postgres_data:
+  redis_data:

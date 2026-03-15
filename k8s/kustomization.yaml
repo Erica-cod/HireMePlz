@@ -1,0 +1,35 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: hiremeplz
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret.yaml
+  - resource-quota.yaml
+  # Infrastructure
+  - postgres/statefulset.yaml
+  - postgres/service.yaml
+  - redis/deployment.yaml
+  - redis/service.yaml
+  # Application services
+  - backend/deployment.yaml
+  - backend/service.yaml
+  - frontend/deployment.yaml
+  - frontend/service.yaml
+  - worker/deployment.yaml
+  - worker-llm/deployment.yaml
+  # Autoscaling
+  - hpa.yaml
+  # Availability
+  - pdb.yaml
+  # Network security
+  - network-policy.yaml
+  # Ingress
+  - ingress.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/managed-by: kustomize
+    includeSelectors: false
