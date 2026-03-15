@@ -2,11 +2,13 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { prisma } from "../../lib/prisma.js";
+import { scrapeTriggerQueue } from "../../lib/scrape-trigger.js";
 import {
   AuthenticatedRequest,
   requireAuth
 } from "../../middleware/auth.js";
 import { asyncHandler } from "../../middleware/async-handler.js";
+import { upsertAutoSubscriptionFromProfile } from "../jobs/auto-subscription.js";
 
 const router = Router();
 
@@ -99,7 +101,15 @@ router.put(
       }
     });
 
-    response.json({ profile });
+    const subResult = await upsertAutoSubscriptionFromProfile(request.userId!);
+    if (subResult) {
+      await scrapeTriggerQueue.add("profile-save", {
+        subscriptionId: subResult.subscription.id,
+        userId: request.userId!
+      });
+    }
+
+    response.json({ profile, subscriptionCreated: subResult?.created ?? false });
   })
 );
 
