@@ -16,6 +16,8 @@ export type LlmJobData = {
     result: string;
   } | null;
   experiences: Array<{ title: string; description: string }>;
+  selectOptions?: string[];
+  profileSummary?: string;
 };
 
 export type LlmJobResult = {
