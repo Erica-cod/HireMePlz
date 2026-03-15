@@ -12,6 +12,7 @@ const navItems = [
   { href: "/dashboard/answer-memory", label: "Answer Memory" },
   { href: "/dashboard/applications", label: "Applications" },
   { href: "/dashboard/jobs", label: "Job Matches" },
+  { href: "/dashboard/jobs/subscriptions", label: "Subscriptions" },
 ];
 
 export function DashboardLayout({ children }: { children: ReactNode }) {
