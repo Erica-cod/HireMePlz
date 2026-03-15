@@ -254,7 +254,7 @@ async function ingestJobsForSubscription(subscription: JobSubscription) {
   };
 }
 
-async function processSubscription(subscription: JobSubscription) {
+export async function processSubscription(subscription: JobSubscription) {
   const startedAt = new Date();
 
   await prisma.jobSubscription.update({

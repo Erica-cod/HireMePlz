@@ -1,0 +1,12 @@
+import { workerEnv } from "./env.js";
+
+function parseRedisUrl(url: string) {
+  const parsed = new URL(url);
+  return {
+    host: parsed.hostname || "localhost",
+    port: Number(parsed.port) || 6379,
+    password: parsed.password || undefined
+  };
+}
+
+export const redisConnectionOptions = parseRedisUrl(workerEnv.redisUrl);

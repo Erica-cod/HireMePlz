@@ -10,6 +10,7 @@ function parsePositiveInt(value: string | undefined, fallback: number) {
 
 export const workerEnv = {
   databaseUrl: process.env.DATABASE_URL || "",
+  redisUrl: process.env.REDIS_URL || "redis://localhost:6379",
   workerPollIntervalMs: parsePositiveInt(process.env.WORKER_POLL_INTERVAL_MS, 10 * 60 * 1000),
   jobspyFetchCommand: (process.env.JOBSPY_FETCH_COMMAND || "").trim(),
   jsearchApiKey: process.env.JSEARCH_API_KEY || "",

@@ -94,10 +94,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     env_file:
       - ./.env
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/hiremeplz?schema=public
+      REDIS_URL: redis://redis:6379
       JOBSPY_FETCH_COMMAND: "python scripts/jobspy_fetch.py"
 
   worker-llm:
