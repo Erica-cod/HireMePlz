@@ -4,7 +4,8 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 import { AuthGate } from "../../../components/auth-gate";
-import { apiRequest, splitCommaText } from "../../../lib/api";
+import { apiRequest } from "../../../lib/api";
+import { TagInput } from "../../../components/tag-input";
 import type { Story } from "../../../types";
 
 const CATEGORIES = [
@@ -57,8 +58,20 @@ function StoriesContent({ token }: { token: string }) {
     setIsNew(false);
   }
 
+  const [formError, setFormError] = useState("");
+
   async function handleSave() {
     if (!editing) return;
+    if (
+      !editing.title?.trim() ||
+      !editing.situation?.trim() ||
+      !editing.action?.trim() ||
+      !editing.result?.trim()
+    ) {
+      setFormError("Please fill in Title, Situation, Action, and Result.");
+      return;
+    }
+    setFormError("");
     try {
       if (isNew) {
         await apiRequest("/stories", {
@@ -132,7 +145,7 @@ function StoriesContent({ token }: { token: string }) {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Title</label>
+              <label className="block text-sm font-medium mb-1">Title <span className="text-red-500">*</span></label>
               <input
                 type="text"
                 value={editing.title || ""}
@@ -142,25 +155,15 @@ function StoriesContent({ token }: { token: string }) {
                 className="w-full rounded-lg border px-3 py-2 text-sm"
               />
             </div>
+            <TagInput
+              label="Tags"
+              tags={editing.promptTags || []}
+              onChange={(promptTags) => setEditing({ ...editing, promptTags })}
+              placeholder="e.g. teamwork, leadership"
+            />
             <div>
               <label className="block text-sm font-medium mb-1">
-                Tags (comma separated)
-              </label>
-              <input
-                type="text"
-                value={(editing.promptTags || []).join(", ")}
-                onChange={(e) =>
-                  setEditing({
-                    ...editing,
-                    promptTags: splitCommaText(e.target.value),
-                  })
-                }
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Situation
+                Situation <span className="text-red-500">*</span>
               </label>
               <textarea
                 value={editing.situation || ""}
@@ -172,7 +175,7 @@ function StoriesContent({ token }: { token: string }) {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Task</label>
+              <label className="block text-sm font-medium mb-1">Task <span className="text-gray-400 font-normal">(optional)</span></label>
               <textarea
                 value={editing.task || ""}
                 onChange={(e) =>
@@ -183,7 +186,7 @@ function StoriesContent({ token }: { token: string }) {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Action</label>
+              <label className="block text-sm font-medium mb-1">Action <span className="text-red-500">*</span></label>
               <textarea
                 value={editing.action || ""}
                 onChange={(e) =>
@@ -194,7 +197,7 @@ function StoriesContent({ token }: { token: string }) {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Result</label>
+              <label className="block text-sm font-medium mb-1">Result <span className="text-red-500">*</span></label>
               <textarea
                 value={editing.result || ""}
                 onChange={(e) =>
@@ -204,7 +207,7 @@ function StoriesContent({ token }: { token: string }) {
                 className="w-full rounded-lg border px-3 py-2 text-sm"
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               <button
                 onClick={handleSave}
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
@@ -212,11 +215,14 @@ function StoriesContent({ token }: { token: string }) {
                 Save
               </button>
               <button
-                onClick={() => setEditing(null)}
+                onClick={() => { setEditing(null); setFormError(""); }}
                 className="rounded-lg border px-4 py-2 text-sm hover:bg-gray-100"
               >
                 Cancel
               </button>
+              {formError && (
+                <span className="text-red-500 text-sm">{formError}</span>
+              )}
             </div>
           </div>
         </div>
@@ -231,7 +237,9 @@ function StoriesContent({ token }: { token: string }) {
         </div>
       ) : (
         <div className="space-y-4">
-          {stories.map((story) => (
+          {stories
+            .filter((story) => !editing || isNew || editing.id !== story.id)
+            .map((story) => (
             <div
               key={story.id}
               className="rounded-xl border bg-white p-6 shadow-sm"
@@ -246,9 +254,12 @@ function StoriesContent({ token }: { token: string }) {
                   <p className="text-sm text-gray-500 mt-1">
                     Tags: {story.promptTags.join(", ") || "None"}
                   </p>
-                  <p className="text-sm text-gray-600 mt-1 line-clamp-3">
-                    {story.situation}
-                  </p>
+                  <div className="text-sm text-gray-600 mt-2 space-y-1">
+                    <p><span className="font-medium text-gray-700">Situation:</span> <span className="line-clamp-2">{story.situation}</span></p>
+                    {story.task && <p><span className="font-medium text-gray-700">Task:</span> <span className="line-clamp-1">{story.task}</span></p>}
+                    <p><span className="font-medium text-gray-700">Action:</span> <span className="line-clamp-2">{story.action}</span></p>
+                    <p><span className="font-medium text-gray-700">Result:</span> <span className="line-clamp-1">{story.result}</span></p>
+                  </div>
                 </div>
                 <div className="flex gap-2 ml-4 shrink-0">
                   <button

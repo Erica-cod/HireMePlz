@@ -4,7 +4,8 @@ export const dynamic = "force-dynamic";
 
 import { useEffect, useState } from "react";
 import { AuthGate } from "../../../components/auth-gate";
-import { apiRequest, splitCommaText } from "../../../lib/api";
+import { apiRequest } from "../../../lib/api";
+import { TagInput } from "../../../components/tag-input";
 import type { Experience } from "../../../types";
 
 const emptyForm = {
@@ -12,8 +13,8 @@ const emptyForm = {
   company: "",
   location: "",
   description: "",
-  highlights: "",
-  skills: "",
+  highlights: [] as string[],
+  skills: [] as string[],
 };
 
 export default function ExperiencesPage() {
@@ -54,20 +55,23 @@ function ExperiencesContent({ token }: { token: string }) {
         company: exp.company || "",
         location: exp.location || "",
         description: exp.description || "",
-        highlights: exp.highlights.join(", "),
-        skills: exp.skills.join(", "),
+        highlights: [...exp.highlights],
+        skills: [...exp.skills],
       },
     });
   }
 
+  const [formError, setFormError] = useState("");
+
   async function handleSave() {
     if (!editing) return;
+    if (!editing.form.title.trim() || !editing.form.description.trim()) {
+      setFormError("Please fill in Title and Description.");
+      return;
+    }
+    setFormError("");
     try {
-      const body = {
-        ...editing.form,
-        highlights: splitCommaText(editing.form.highlights),
-        skills: splitCommaText(editing.form.skills),
-      };
+      const body = { ...editing.form };
       if (editing.mode === "new") {
         await apiRequest("/experiences", { method: "POST", token, body });
       } else {
@@ -124,7 +128,7 @@ function ExperiencesContent({ token }: { token: string }) {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Title</label>
+                <label className="block text-sm font-medium mb-1">Title <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   placeholder="e.g. Software Engineer Intern"
@@ -135,7 +139,7 @@ function ExperiencesContent({ token }: { token: string }) {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Company
+                  Company <span className="text-gray-400 font-normal">(optional)</span>
                 </label>
                 <input
                   type="text"
@@ -147,7 +151,7 @@ function ExperiencesContent({ token }: { token: string }) {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
-                Location
+                Location <span className="text-gray-400 font-normal">(optional)</span>
               </label>
               <input
                 type="text"
@@ -158,7 +162,7 @@ function ExperiencesContent({ token }: { token: string }) {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
-                Description
+                Description <span className="text-red-500">*</span>
               </label>
               <textarea
                 value={editing.form.description}
@@ -167,29 +171,19 @@ function ExperiencesContent({ token }: { token: string }) {
                 className="w-full rounded-lg border px-3 py-2 text-sm"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Highlights (comma separated)
-              </label>
-              <input
-                type="text"
-                value={editing.form.highlights}
-                onChange={(e) => updateForm({ highlights: e.target.value })}
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Skills used (comma separated)
-              </label>
-              <input
-                type="text"
-                value={editing.form.skills}
-                onChange={(e) => updateForm({ skills: e.target.value })}
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-              />
-            </div>
-            <div className="flex gap-2">
+            <TagInput
+              label="Highlights"
+              tags={editing.form.highlights}
+              onChange={(highlights) => updateForm({ highlights })}
+              placeholder="e.g. Reduced latency by 40%"
+            />
+            <TagInput
+              label="Skills used"
+              tags={editing.form.skills}
+              onChange={(skills) => updateForm({ skills })}
+              placeholder="e.g. Python, React"
+            />
+            <div className="flex items-center gap-2">
               <button
                 onClick={handleSave}
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
@@ -197,11 +191,14 @@ function ExperiencesContent({ token }: { token: string }) {
                 Save
               </button>
               <button
-                onClick={() => setEditing(null)}
+                onClick={() => { setEditing(null); setFormError(""); }}
                 className="rounded-lg border px-4 py-2 text-sm hover:bg-gray-100"
               >
                 Cancel
               </button>
+              {formError && (
+                <span className="text-red-500 text-sm">{formError}</span>
+              )}
             </div>
           </div>
         </div>
@@ -215,7 +212,9 @@ function ExperiencesContent({ token }: { token: string }) {
         </div>
       ) : (
         <div className="space-y-4">
-          {experiences.map((exp) => (
+          {experiences
+            .filter((exp) => !editing || editing.mode !== "edit" || editing.id !== exp.id)
+            .map((exp) => (
             <div
               key={exp.id}
               className="rounded-xl border bg-white p-6 shadow-sm"
