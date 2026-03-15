@@ -15,6 +15,8 @@ export type LlmJobData = {
     result: string;
   } | null;
   experiences: Array<{ title: string; description: string }>;
+  selectOptions?: string[];
+  profileSummary?: string;
 };
 
 export type LlmJobResult = {
@@ -57,14 +59,83 @@ function buildFallbackAnswer(
   return "I can further answer this question by combining details from my projects and internship experience.";
 }
 
+function buildSelectFallbackAnswer(
+  question: string,
+  options: string[],
+  profileSummary: string,
+  experiences: LlmJobData["experiences"]
+): string {
+  const q = question.toLowerCase();
+
+  const totalYears = experiences.length > 0 ? Math.max(1, experiences.length) : 0;
+
+  if (q.includes("experience") && (q.includes("year") || q.includes("total"))) {
+    const sorted = options
+      .map((o) => ({ text: o, nums: o.match(/(\d+)/g)?.map(Number) || [] }))
+      .filter((o) => o.nums.length > 0)
+      .sort((a, b) => {
+        const aAvg = a.nums.reduce((s, n) => s + n, 0) / a.nums.length;
+        const bAvg = b.nums.reduce((s, n) => s + n, 0) / b.nums.length;
+        return Math.abs(aAvg - totalYears) - Math.abs(bAvg - totalYears);
+      });
+    if (sorted[0]) return sorted[0].text;
+  }
+
+  if (q.includes("degree") || q.includes("bachelor") || q.includes("education")) {
+    const yesOpt = options.find((o) => /^yes/i.test(o.trim()));
+    if (yesOpt && profileSummary.toLowerCase().includes("education:")) return yesOpt;
+  }
+
+  if (q.includes("programming") || q.includes("language") || q.includes("coding")) {
+    const yesOpt = options.find((o) => /^yes/i.test(o.trim()));
+    if (yesOpt && profileSummary.toLowerCase().includes("skills:")) return yesOpt;
+  }
+
+  return options[0] || "";
+}
+
 export async function processAutofillJob(
   job: Job<LlmJobData, LlmJobResult>
 ): Promise<LlmJobResult> {
-  const { company, experiences, question, role, story } = job.data;
+  const { company, experiences, question, role, story, selectOptions, profileSummary } = job.data;
+
+  const isSelectQuestion = Array.isArray(selectOptions) && selectOptions.length > 0;
 
   if (!openai) {
     console.log(`[worker-llm] No OpenAI key, using fallback for job ${job.id}`);
+    if (isSelectQuestion) {
+      return { answer: buildSelectFallbackAnswer(question, selectOptions, profileSummary || "", experiences) };
+    }
     return { answer: buildFallbackAnswer(question, company, role, story, experiences) };
+  }
+
+  if (isSelectQuestion) {
+    const prompt = [
+      `Candidate Profile: ${profileSummary || "Not provided"}`,
+      `Company: ${company || "Not provided"}`,
+      `Role: ${role || "Not provided"}`,
+      "",
+      `Question: ${question}`,
+      `Available Options:`,
+      ...selectOptions.map((o, i) => `  ${i + 1}. ${o}`),
+      "",
+      "Pick the single best matching option for this candidate. Reply with ONLY the exact option text."
+    ].join("\n");
+
+    console.log(`[worker-llm] Calling LLM for select question, job ${job.id}`);
+
+    const completion = await openai.chat.completions.create({
+      model: llmEnv.openaiModel,
+      messages: [
+        { role: "system", content: "You are a job application assistant. Given a candidate profile and a multiple-choice question, pick the best matching option. Reply with ONLY the exact option text, no explanation." },
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.1
+    });
+
+    const answer = (completion.choices[0]?.message?.content ?? "").trim();
+    console.log(`[worker-llm] LLM selected "${answer}" for job ${job.id}`);
+    return { answer };
   }
 
   const prompt = [
