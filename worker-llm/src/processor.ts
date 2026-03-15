@@ -9,10 +9,7 @@ export type LlmJobData = {
   role?: string;
   story: {
     title: string;
-    situation: string;
-    task: string | null;
-    action: string;
-    result: string;
+    content: string;
   } | null;
   experiences: Array<{ title: string; description: string }>;
   selectOptions?: string[];
@@ -40,10 +37,7 @@ function buildFallbackAnswer(
   if (story) {
     return [
       `For "${question}", I would answer using my ${story.title} experience.`,
-      `Situation: ${story.situation}`,
-      story.task ? `Task: ${story.task}` : "",
-      `Action: ${story.action}`,
-      `Result: ${story.result}`,
+      story.content,
       company || role
         ? `This experience is highly relevant to the ${role || "position"} at ${company || "your company"}.`
         : "This experience demonstrates practical problem-solving and continuous learning."
@@ -143,10 +137,7 @@ export async function processAutofillJob(
     `Company: ${company || "Not provided"}`,
     `Question: ${question}`,
     `Story title: ${story?.title || "Not provided"}`,
-    `Situation: ${story?.situation || "Not provided"}`,
-    `Task: ${story?.task || "Not provided"}`,
-    `Action: ${story?.action || "Not provided"}`,
-    `Result: ${story?.result || "Not provided"}`
+    `Story content: ${story?.content || "Not provided"}`
   ].join("\n");
 
   console.log(`[worker-llm] Calling LLM for job ${job.id}`);

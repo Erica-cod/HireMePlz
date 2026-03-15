@@ -1,8 +1,6 @@
-import { createHash } from "node:crypto";
 import type { Education, Experience, Profile, StoryItem } from "@prisma/client";
 
 import { env } from "../config/env.js";
-import { prisma } from "./prisma.js";
 import { llmQueue, llmQueueEvents } from "./llm-queue.js";
 import type { LlmJobResult } from "./llm-queue.js";
 
@@ -71,18 +69,6 @@ function normalizeText(...parts: Array<string | undefined>) {
     .join(" ")
     .trim()
     .toLowerCase();
-}
-
-function normalizeCacheKeyPart(value?: string) {
-  return value?.trim().toLowerCase().replace(/\s+/g, " ") || "";
-}
-
-function normalizeQuestionText(question: string) {
-  return question.trim().toLowerCase().replace(/\s+/g, " ");
-}
-
-function buildQuestionHash(question: string) {
-  return createHash("sha256").update(normalizeQuestionText(question)).digest("hex");
 }
 
 function isOpenQuestion(field: AutofillFieldInput) {
@@ -383,26 +369,34 @@ export function scoreStructuredField(
 }
 
 function pickRelevantStory(question: string, stories: StoryItem[]) {
+  if (stories.length === 0) return null;
+
   const normalized = question.toLowerCase();
+  const questionWords = normalized.split(/\s+/);
 
-  const categoryOrder: Array<StoryItem["category"]> = normalized.includes("why")
-    ? ["why_company", "general", "project"]
-    : normalized.includes("leader")
-      ? ["leadership", "teamwork", "project"]
-      : normalized.includes("chall")
-        ? ["challenge", "project", "behavioral"]
-        : normalized.includes("team")
-          ? ["teamwork", "leadership", "behavioral"]
-          : ["project", "general", "behavioral"];
+  let bestStory: StoryItem | null = null;
+  let bestScore = 0;
 
-  for (const category of categoryOrder) {
-    const match = stories.find((story) => story.category === category);
-    if (match) {
-      return match;
+  for (const story of stories) {
+    let score = 0;
+    for (const tag of story.tags) {
+      const tagLower = tag.toLowerCase();
+      if (normalized.includes(tagLower)) {
+        score += tagLower.split(/\s+/).length > 1 ? 2 : 1;
+      }
+      for (const word of questionWords) {
+        if (word.length > 3 && tagLower.includes(word)) {
+          score += 0.5;
+        }
+      }
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestStory = story;
     }
   }
 
-  return stories[0] ?? null;
+  return bestStory ?? stories[0];
 }
 
 function buildFallbackAnswer(
@@ -415,10 +409,7 @@ function buildFallbackAnswer(
   if (story) {
     return [
       `For "${question}", I would answer using my ${story.title} experience.`,
-      `Situation: ${story.situation}`,
-      story.task ? `Task: ${story.task}` : "",
-      `Action: ${story.action}`,
-      `Result: ${story.result}`,
+      story.content,
       company || role
         ? `This experience is highly relevant to the ${role || "position"} at ${company || "your company"}.`
         : "This experience demonstrates practical problem-solving and continuous learning."
@@ -454,10 +445,7 @@ async function buildOpenEndedAnswer(params: {
       story: story
         ? {
             title: story.title,
-            situation: story.situation,
-            task: story.task,
-            action: story.action,
-            result: story.result
+            content: story.content
           }
         : null,
       experiences: experiences.slice(0, 3).map((exp) => ({
@@ -497,46 +485,6 @@ export async function buildSuggestions(params: {
     if (isOpenQuestion(field)) {
       const question =
         field.label || field.placeholder || field.nearbyText || field.name || "";
-      const questionHash = buildQuestionHash(question);
-      const companyKey = normalizeCacheKeyPart(company);
-      const roleKey = normalizeCacheKeyPart(role);
-      const cachedAnswer = await prisma.answerMemory.findUnique({
-        where: {
-          userId_questionHash_companyKey_roleKey: {
-            userId,
-            questionHash,
-            companyKey,
-            roleKey
-          }
-        }
-      });
-
-      if (cachedAnswer?.answer) {
-        await prisma.answerMemory.update({
-          where: {
-            userId_questionHash_companyKey_roleKey: {
-              userId,
-              questionHash,
-              companyKey,
-              roleKey
-            }
-          },
-          data: {
-            hitCount: { increment: 1 },
-            lastUsedAt: new Date()
-          }
-        });
-
-        suggestions.push({
-          fieldId: field.id,
-          label: field.label || field.name || field.id,
-          kind: "open_ended",
-          confidence: 0.92,
-          value: cachedAnswer.answer,
-          reasoning: "Reused previously generated answer from answer memory cache"
-        });
-        continue;
-      }
 
       const story = pickRelevantStory(question, stories);
       const value = await buildOpenEndedAnswer({
@@ -546,32 +494,6 @@ export async function buildSuggestions(params: {
         role,
         story,
         experiences
-      });
-      await prisma.answerMemory.upsert({
-        where: {
-          userId_questionHash_companyKey_roleKey: {
-            userId,
-            questionHash,
-            companyKey,
-            roleKey
-          }
-        },
-        create: {
-          userId,
-          questionHash,
-          companyKey,
-          roleKey,
-          question,
-          answer: value,
-          hitCount: 1,
-          lastUsedAt: new Date()
-        },
-        update: {
-          question,
-          answer: value,
-          hitCount: { increment: 1 },
-          lastUsedAt: new Date()
-        }
       });
 
       suggestions.push({
