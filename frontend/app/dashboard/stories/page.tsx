@@ -8,16 +8,6 @@ import { apiRequest } from "../../../lib/api";
 import { TagInput } from "../../../components/tag-input";
 import type { Story } from "../../../types";
 
-const CATEGORIES = [
-  { value: "challenge", label: "Challenge / Difficulty" },
-  { value: "leadership", label: "Leadership" },
-  { value: "teamwork", label: "Teamwork / Collaboration" },
-  { value: "project", label: "Project" },
-  { value: "why_company", label: "Why This Company" },
-  { value: "behavioral", label: "Behavioral" },
-  { value: "general", label: "General" },
-];
-
 export default function StoriesPage() {
   return (
     <AuthGate>{(token) => <StoriesContent token={token} />}</AuthGate>
@@ -29,6 +19,7 @@ function StoriesContent({ token }: { token: string }) {
   const [message, setMessage] = useState("");
   const [editing, setEditing] = useState<Partial<Story> | null>(null);
   const [isNew, setIsNew] = useState(false);
+  const [formError, setFormError] = useState("");
 
   function loadData() {
     apiRequest<{ stories: Story[] }>("/stories", { token })
@@ -43,12 +34,8 @@ function StoriesContent({ token }: { token: string }) {
   function startNew() {
     setEditing({
       title: "",
-      category: "project",
-      promptTags: [],
-      situation: "",
-      task: "",
-      action: "",
-      result: "",
+      tags: [],
+      content: "",
     });
     setIsNew(true);
   }
@@ -58,17 +45,10 @@ function StoriesContent({ token }: { token: string }) {
     setIsNew(false);
   }
 
-  const [formError, setFormError] = useState("");
-
   async function handleSave() {
     if (!editing) return;
-    if (
-      !editing.title?.trim() ||
-      !editing.situation?.trim() ||
-      !editing.action?.trim() ||
-      !editing.result?.trim()
-    ) {
-      setFormError("Please fill in Title, Situation, Action, and Result.");
+    if (!editing.title?.trim() || !editing.content?.trim()) {
+      setFormError("Please fill in Title and Content.");
       return;
     }
     setFormError("");
@@ -128,24 +108,8 @@ function StoriesContent({ token }: { token: string }) {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-1">
-                Category
+                Title <span className="text-red-500">*</span>
               </label>
-              <select
-                value={editing.category || "project"}
-                onChange={(e) =>
-                  setEditing({ ...editing, category: e.target.value })
-                }
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Title <span className="text-red-500">*</span></label>
               <input
                 type="text"
                 value={editing.title || ""}
@@ -157,54 +121,22 @@ function StoriesContent({ token }: { token: string }) {
             </div>
             <TagInput
               label="Tags"
-              tags={editing.promptTags || []}
-              onChange={(promptTags) => setEditing({ ...editing, promptTags })}
-              placeholder="e.g. teamwork, leadership"
+              tags={editing.tags || []}
+              onChange={(tags) => setEditing({ ...editing, tags })}
+              placeholder="e.g. leadership, react, team conflict"
             />
             <div>
               <label className="block text-sm font-medium mb-1">
-                Situation <span className="text-red-500">*</span>
+                Content <span className="text-red-500">*</span>
               </label>
               <textarea
-                value={editing.situation || ""}
+                value={editing.content || ""}
                 onChange={(e) =>
-                  setEditing({ ...editing, situation: e.target.value })
+                  setEditing({ ...editing, content: e.target.value })
                 }
-                rows={3}
+                rows={8}
                 className="w-full rounded-lg border px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Task <span className="text-gray-400 font-normal">(optional)</span></label>
-              <textarea
-                value={editing.task || ""}
-                onChange={(e) =>
-                  setEditing({ ...editing, task: e.target.value })
-                }
-                rows={2}
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Action <span className="text-red-500">*</span></label>
-              <textarea
-                value={editing.action || ""}
-                onChange={(e) =>
-                  setEditing({ ...editing, action: e.target.value })
-                }
-                rows={3}
-                className="w-full rounded-lg border px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Result <span className="text-red-500">*</span></label>
-              <textarea
-                value={editing.result || ""}
-                onChange={(e) =>
-                  setEditing({ ...editing, result: e.target.value })
-                }
-                rows={2}
-                className="w-full rounded-lg border px-3 py-2 text-sm"
+                placeholder="Write your story here. You can use any format (STAR, free-form, etc.)"
               />
             </div>
             <div className="flex items-center gap-2">
@@ -245,21 +177,23 @@ function StoriesContent({ token }: { token: string }) {
               className="rounded-xl border bg-white p-6 shadow-sm"
             >
               <div className="flex items-start justify-between">
-                <div>
-                  <span className="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 mb-2">
-                    {CATEGORIES.find((c) => c.value === story.category)
-                      ?.label ?? story.category}
-                  </span>
+                <div className="min-w-0">
                   <h3 className="font-semibold">{story.title}</h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Tags: {story.promptTags.join(", ") || "None"}
+                  {story.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {story.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-sm text-gray-600 mt-2 whitespace-pre-wrap line-clamp-4">
+                    {story.content}
                   </p>
-                  <div className="text-sm text-gray-600 mt-2 space-y-1">
-                    <p><span className="font-medium text-gray-700">Situation:</span> <span className="line-clamp-2">{story.situation}</span></p>
-                    {story.task && <p><span className="font-medium text-gray-700">Task:</span> <span className="line-clamp-1">{story.task}</span></p>}
-                    <p><span className="font-medium text-gray-700">Action:</span> <span className="line-clamp-2">{story.action}</span></p>
-                    <p><span className="font-medium text-gray-700">Result:</span> <span className="line-clamp-1">{story.result}</span></p>
-                  </div>
                 </div>
                 <div className="flex gap-2 ml-4 shrink-0">
                   <button
