@@ -19,10 +19,13 @@ export type AutofillFieldInput = {
 export type AutofillSuggestion = {
   fieldId: string;
   label: string;
-  kind: "structured" | "open_ended";
+  kind: "structured" | "open_ended" | "no_match";
   confidence: number;
   value: string;
   reasoning: string;
+  sourceStoryId?: string;
+  sourceStoryTitle?: string;
+  matchScore?: number;
 };
 
 type StructuredRuleKey =
@@ -292,6 +295,7 @@ async function answerSelectByLLM(params: {
   const job = await llmQueue.add(
     "select-question",
     {
+      mode: "select",
       userId,
       question: formattedQuestion,
       company,
@@ -313,7 +317,7 @@ async function answerSelectByLLM(params: {
       env.LLM_JOB_TIMEOUT_MS
     )) as LlmJobResult;
 
-    const answer = result.answer.trim();
+    const answer = (result.answer ?? "").trim();
     const matched = validOptions.find(
       (o) => o.trim().toLowerCase() === answer.toLowerCase()
     );
@@ -368,90 +372,26 @@ export function scoreStructuredField(
   return best;
 }
 
-function pickRelevantStory(question: string, stories: StoryItem[]) {
-  if (stories.length === 0) return null;
-
-  const normalized = question.toLowerCase();
-  const questionWords = normalized.split(/\s+/);
-
-  let bestStory: StoryItem | null = null;
-  let bestScore = 0;
-
-  for (const story of stories) {
-    let score = 0;
-    for (const tag of story.tags) {
-      const tagLower = tag.toLowerCase();
-      if (normalized.includes(tagLower)) {
-        score += tagLower.split(/\s+/).length > 1 ? 2 : 1;
-      }
-      for (const word of questionWords) {
-        if (word.length > 3 && tagLower.includes(word)) {
-          score += 0.5;
-        }
-      }
-    }
-    if (score > bestScore) {
-      bestScore = score;
-      bestStory = story;
-    }
-  }
-
-  return bestStory ?? stories[0];
-}
-
-function buildFallbackAnswer(
-  question: string,
-  company: string | undefined,
-  role: string | undefined,
-  story: StoryItem | null,
-  experiences: Experience[]
-) {
-  if (story) {
-    return [
-      `For "${question}", I would answer using my ${story.title} experience.`,
-      story.content,
-      company || role
-        ? `This experience is highly relevant to the ${role || "position"} at ${company || "your company"}.`
-        : "This experience demonstrates practical problem-solving and continuous learning."
-    ]
-      .filter(Boolean)
-      .join("\n");
-  }
-
-  if (experiences[0]) {
-    return `${experiences[0].title} is my most relevant experience. In this role, I worked on ${experiences[0].description} and gained hands-on experience related to this question.`;
-  }
-
-  return "I can further answer this question by combining details from my projects and internship experience.";
-}
-
-async function buildOpenEndedAnswer(params: {
+async function scoreStoriesByLLM(params: {
   userId: string;
   question: string;
+  stories: StoryItem[];
   company?: string;
   role?: string;
-  story: StoryItem | null;
-  experiences: Experience[];
-}) {
-  const { company, experiences, question, role, story, userId } = params;
+}): Promise<{ story: StoryItem; score: number } | null> {
+  const { userId, question, stories, company, role } = params;
+
+  if (stories.length === 0) return null;
 
   const job = await llmQueue.add(
-    "autofill",
+    "score-stories",
     {
+      mode: "scoring",
       userId,
       question,
       company,
       role,
-      story: story
-        ? {
-            title: story.title,
-            content: story.content
-          }
-        : null,
-      experiences: experiences.slice(0, 3).map((exp) => ({
-        title: exp.title,
-        description: exp.description
-      }))
+      stories: stories.map((s) => ({ id: s.id, title: s.title, content: s.content })),
     },
     { removeOnComplete: 100, removeOnFail: 200 }
   );
@@ -461,9 +401,19 @@ async function buildOpenEndedAnswer(params: {
       llmQueueEvents,
       env.LLM_JOB_TIMEOUT_MS
     )) as LlmJobResult;
-    return result.answer;
+
+    const scores = result.scores ?? [];
+    if (scores.length === 0) return null;
+
+    const best = scores.reduce((a, b) => (a.score >= b.score ? a : b));
+    if (best.score < env.STORY_MATCH_THRESHOLD) return null;
+
+    const matched = stories.find((s) => s.id === best.storyId);
+    if (!matched) return null;
+
+    return { story: matched, score: best.score };
   } catch {
-    return buildFallbackAnswer(question, company, role, story, experiences);
+    return null;
   }
 }
 
@@ -486,26 +436,36 @@ export async function buildSuggestions(params: {
       const question =
         field.label || field.placeholder || field.nearbyText || field.name || "";
 
-      const story = pickRelevantStory(question, stories);
-      const value = await buildOpenEndedAnswer({
+      const match = await scoreStoriesByLLM({
         userId,
         question,
+        stories,
         company,
         role,
-        story,
-        experiences
       });
 
-      suggestions.push({
-        fieldId: field.id,
-        label: field.label || field.name || field.id,
-        kind: "open_ended",
-        confidence: story ? 0.82 : 0.45,
-        value,
-        reasoning: story
-          ? `Generated from story library item: ${story.title}`
-          : "No matching story found, generated from base template"
-      });
+      if (match) {
+        suggestions.push({
+          fieldId: field.id,
+          label: field.label || field.name || field.id,
+          kind: "open_ended",
+          confidence: match.score,
+          value: match.story.content,
+          reasoning: `Matched story: ${match.story.title} (score: ${match.score.toFixed(2)})`,
+          sourceStoryId: match.story.id,
+          sourceStoryTitle: match.story.title,
+          matchScore: match.score,
+        });
+      } else {
+        suggestions.push({
+          fieldId: field.id,
+          label: field.label || field.name || field.id,
+          kind: "no_match",
+          confidence: 0,
+          value: "",
+          reasoning: "No story matched above the relevance threshold",
+        });
+      }
       continue;
     }
 
