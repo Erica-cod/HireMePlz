@@ -11,7 +11,9 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().optional().default(""),
   OPENAI_MODEL: z.string().default("gpt-4o-mini"),
   PORT: z.coerce.number().default(4000),
-  LLM_JOB_TIMEOUT_MS: z.coerce.number().default(30_000)
+  LLM_JOB_TIMEOUT_MS: z.coerce.number().default(30_000),
+  STORY_MATCH_THRESHOLD: z.coerce.number().default(0.6),
+  LLM_AUTOFILL_MODE: z.enum(["scoring", "synthesis"]).default("scoring")
 });
 
 export const env = envSchema.parse(process.env);

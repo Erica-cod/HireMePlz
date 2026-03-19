@@ -3,21 +3,24 @@ import { OpenAI } from "openai";
 import { llmEnv } from "./lib/env.js";
 
 export type LlmJobData = {
+  mode: "scoring" | "synthesis" | "select";
   userId: string;
   question: string;
   company?: string;
   role?: string;
-  story: {
-    title: string;
-    content: string;
-  } | null;
-  experiences: Array<{ title: string; description: string }>;
+  stories?: Array<{ id: string; title: string; content: string }>;
+  story?: { title: string; content: string } | null;
+  experiences?: Array<{ title: string; description: string }>;
   selectOptions?: string[];
   profileSummary?: string;
 };
 
+export type StoryScore = { storyId: string; score: number };
+
 export type LlmJobResult = {
-  answer: string;
+  mode: "scoring" | "synthesis" | "select";
+  scores?: StoryScore[];
+  answer?: string;
 };
 
 const openai = llmEnv.openaiApiKey
@@ -27,40 +30,119 @@ const openai = llmEnv.openaiApiKey
     })
   : null;
 
-function buildFallbackAnswer(
+function scoreFallback(
   question: string,
+  stories: Array<{ id: string; title: string; content: string }>
+): StoryScore[] {
+  const qWords = question.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+  return stories.map((story) => {
+    const text = `${story.title} ${story.content}`.toLowerCase();
+    let hits = 0;
+    for (const word of qWords) {
+      if (text.includes(word)) hits++;
+    }
+    const score = qWords.length > 0 ? hits / qWords.length : 0;
+    return { storyId: story.id, score: Math.min(score, 1) };
+  });
+}
+
+async function scoreBatch(
+  question: string,
+  stories: Array<{ id: string; title: string; content: string }>,
   company: string | undefined,
-  role: string | undefined,
-  story: LlmJobData["story"],
-  experiences: LlmJobData["experiences"]
-) {
-  if (story) {
-    return [
-      `For "${question}", I would answer using my ${story.title} experience.`,
-      story.content,
-      company || role
-        ? `This experience is highly relevant to the ${role || "position"} at ${company || "your company"}.`
-        : "This experience demonstrates practical problem-solving and continuous learning."
-    ]
-      .filter(Boolean)
-      .join("\n");
+  role: string | undefined
+): Promise<StoryScore[]> {
+  if (!openai) return scoreFallback(question, stories);
+
+  const storiesList = stories
+    .map((s, i) => `[Story ${i + 1}] id="${s.id}"\nTitle: ${s.title}\nContent: ${s.content}`)
+    .join("\n\n");
+
+  const prompt = [
+    `Question from a job application: ${question}`,
+    company ? `Company: ${company}` : null,
+    role ? `Role: ${role}` : null,
+    "",
+    "Here are the candidate's stories:",
+    "",
+    storiesList,
+  ]
+    .filter((line) => line !== null)
+    .join("\n");
+
+  const completion = await openai.chat.completions.create({
+    model: llmEnv.openaiModel,
+    messages: [
+      {
+        role: "system",
+        content: [
+          "You are a relevance scorer. Given a job application question and a list of candidate stories,",
+          "score each story's relevance to the question on a scale of 0 to 1.",
+          "0 means completely irrelevant, 1 means a perfect match.",
+          "Return ONLY a JSON array: [{\"storyId\": \"<id>\", \"score\": <number>}].",
+          "No explanation, no markdown fences, just the raw JSON array.",
+        ].join(" "),
+      },
+      { role: "user", content: prompt },
+    ],
+    temperature: 0,
+  });
+
+  const raw = (completion.choices[0]?.message?.content ?? "").trim();
+  const cleaned = raw
+    .replace(/<think>[\s\S]*?<\/think>\s*/g, "")
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  try {
+    const parsed: unknown = JSON.parse(cleaned);
+    if (!Array.isArray(parsed)) throw new Error("Expected JSON array");
+    return parsed.map((item: { storyId: string; score: number }) => ({
+      storyId: String(item.storyId),
+      score: Math.max(0, Math.min(1, Number(item.score) || 0)),
+    }));
+  } catch (err) {
+    console.error(`[worker-llm] Failed to parse scoring JSON: ${cleaned}`, err);
+    return scoreFallback(question, stories);
+  }
+}
+
+async function processScoringJob(
+  job: Job<LlmJobData, LlmJobResult>
+): Promise<LlmJobResult> {
+  const { question, stories, company, role } = job.data;
+
+  if (!stories || stories.length === 0) {
+    console.log(`[worker-llm] No stories to score for job ${job.id}`);
+    return { mode: "scoring", scores: [] };
   }
 
-  if (experiences[0]) {
-    return `${experiences[0].title} is my most relevant experience. In this role, I worked on ${experiences[0].description} and gained hands-on experience related to this question.`;
+  const batchSize = llmEnv.storyBatchSize;
+  if (stories.length <= batchSize) {
+    console.log(`[worker-llm] Scoring ${stories.length} stories for job ${job.id}`);
+    const scores = await scoreBatch(question, stories, company, role);
+    return { mode: "scoring", scores };
   }
 
-  return "I can further answer this question by combining details from my projects and internship experience.";
+  console.log(`[worker-llm] Scoring ${stories.length} stories in batches of ${batchSize} for job ${job.id}`);
+  const allScores: StoryScore[] = [];
+  for (let i = 0; i < stories.length; i += batchSize) {
+    const batch = stories.slice(i, i + batchSize);
+    const batchScores = await scoreBatch(question, batch, company, role);
+    allScores.push(...batchScores);
+  }
+
+  return { mode: "scoring", scores: allScores };
 }
 
 function buildSelectFallbackAnswer(
   question: string,
   options: string[],
   profileSummary: string,
-  experiences: LlmJobData["experiences"]
+  experiences: Array<{ title: string; description: string }>
 ): string {
   const q = question.toLowerCase();
-
   const totalYears = experiences.length > 0 ? Math.max(1, experiences.length) : 0;
 
   if (q.includes("experience") && (q.includes("year") || q.includes("total"))) {
@@ -88,72 +170,70 @@ function buildSelectFallbackAnswer(
   return options[0] || "";
 }
 
-export async function processAutofillJob(
+async function processSelectJob(
   job: Job<LlmJobData, LlmJobResult>
 ): Promise<LlmJobResult> {
-  const { company, experiences, question, role, story, selectOptions, profileSummary } = job.data;
-
-  const isSelectQuestion = Array.isArray(selectOptions) && selectOptions.length > 0;
+  const { company, experiences = [], question, role, selectOptions, profileSummary } = job.data;
 
   if (!openai) {
-    console.log(`[worker-llm] No OpenAI key, using fallback for job ${job.id}`);
-    if (isSelectQuestion) {
-      return { answer: buildSelectFallbackAnswer(question, selectOptions, profileSummary || "", experiences) };
-    }
-    return { answer: buildFallbackAnswer(question, company, role, story, experiences) };
-  }
-
-  if (isSelectQuestion) {
-    const prompt = [
-      `Candidate Profile: ${profileSummary || "Not provided"}`,
-      `Company: ${company || "Not provided"}`,
-      `Role: ${role || "Not provided"}`,
-      "",
-      `Question: ${question}`,
-      `Available Options:`,
-      ...selectOptions.map((o, i) => `  ${i + 1}. ${o}`),
-      "",
-      "Pick the single best matching option for this candidate. Reply with ONLY the exact option text."
-    ].join("\n");
-
-    console.log(`[worker-llm] Calling LLM for select question, job ${job.id}`);
-
-    const completion = await openai.chat.completions.create({
-      model: llmEnv.openaiModel,
-      messages: [
-        { role: "system", content: "You are a job application assistant. Given a candidate profile and a multiple-choice question, pick the best matching option. Reply with ONLY the exact option text, no explanation." },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.1
-    });
-
-    const answer = (completion.choices[0]?.message?.content ?? "").trim();
-    console.log(`[worker-llm] LLM selected "${answer}" for job ${job.id}`);
-    return { answer };
+    console.log(`[worker-llm] No OpenAI key, using select fallback for job ${job.id}`);
+    return {
+      mode: "select",
+      answer: buildSelectFallbackAnswer(question, selectOptions || [], profileSummary || "", experiences),
+    };
   }
 
   const prompt = [
-    `Role: ${role || "Not provided"}`,
+    `Candidate Profile: ${profileSummary || "Not provided"}`,
     `Company: ${company || "Not provided"}`,
+    `Role: ${role || "Not provided"}`,
+    "",
     `Question: ${question}`,
-    `Story title: ${story?.title || "Not provided"}`,
-    `Story content: ${story?.content || "Not provided"}`
+    `Available Options:`,
+    ...(selectOptions || []).map((o, i) => `  ${i + 1}. ${o}`),
+    "",
+    "Pick the single best matching option for this candidate. Reply with ONLY the exact option text.",
   ].join("\n");
 
-  console.log(`[worker-llm] Calling LLM for job ${job.id}`);
+  console.log(`[worker-llm] Calling LLM for select question, job ${job.id}`);
 
   const completion = await openai.chat.completions.create({
     model: llmEnv.openaiModel,
     messages: [
-      { role: "system", content: "You are a job application assistant. Generate an English answer suitable for a software engineering application form using the user's experience details. Requirements: natural, specific, not exaggerated, and around 120 to 180 words." },
+      {
+        role: "system",
+        content:
+          "You are a job application assistant. Given a candidate profile and a multiple-choice question, pick the best matching option. Reply with ONLY the exact option text, no explanation.",
+      },
       { role: "user", content: prompt },
     ],
+    temperature: 0.1,
   });
 
-  const raw = (completion.choices[0]?.message?.content ?? "").trim();
-  // For some 3rd-party LLM, remove the <think> tag from the response.
-  const answer = raw.replace(/<think>[\s\S]*?<\/think>\s*/g, "").trim();
-  console.log(`[worker-llm] LLM returned ${answer.length} chars for job ${job.id}`);
+  const answer = (completion.choices[0]?.message?.content ?? "").trim();
+  console.log(`[worker-llm] LLM selected "${answer}" for job ${job.id}`);
+  return { mode: "select", answer };
+}
 
-  return { answer };
+export async function processAutofillJob(
+  job: Job<LlmJobData, LlmJobResult>
+): Promise<LlmJobResult> {
+  const mode = job.data.mode || "select";
+
+  switch (mode) {
+    case "scoring":
+      return processScoringJob(job);
+
+    case "select":
+      return processSelectJob(job);
+
+    // TODO: refactor into synthesis mode
+    case "synthesis":
+      console.warn(`[worker-llm] Synthesis mode not yet implemented, job ${job.id}`);
+      return { mode: "synthesis", answer: "" };
+
+    default:
+      console.error(`[worker-llm] Unknown mode "${mode}" for job ${job.id}`);
+      return { mode: "select", answer: "" };
+  }
 }

@@ -4,12 +4,14 @@ import type { PageField } from "./detectors";
 export type MatchResult = {
   field_id: string;
   element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
-  type: "structured" | "open_ended" | "unmatched";
+  type: "structured" | "open_ended" | "no_match" | "unmatched";
   label: string;
   value: string | null;
   confidence: number;
-  source: "rule_match" | "llm_pending" | "llm" | "none";
+  source: "rule_match" | "llm_pending" | "llm" | "story_match" | "none";
   profileKey?: string;
+  sourceStoryTitle?: string;
+  matchScore?: number;
 };
 
 export function matchFields(

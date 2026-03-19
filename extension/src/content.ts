@@ -58,10 +58,13 @@ let autofillContext: { company: string; role: string } = {
 type BackendSuggestion = {
   fieldId: string;
   label: string;
-  kind: "structured" | "open_ended";
+  kind: "structured" | "open_ended" | "no_match";
   confidence: number;
   value: string;
   reasoning: string;
+  sourceStoryId?: string;
+  sourceStoryTitle?: string;
+  matchScore?: number;
 };
 
 function isApplicationPage(): boolean {
@@ -158,6 +161,7 @@ function escapeHtml(str: string): string {
 
 function getIcon(source: string): string {
   if (source === "rule_match") return "\u2713";
+  if (source === "story_match") return "\uD83D\uDCD6";
   if (source === "llm" || source === "llm_pending") return "\uD83E\uDD16";
   return "?";
 }
@@ -171,9 +175,21 @@ function showPreviewPanel(): void {
 
   const fieldsHtml = matchResults
     .map((r, i) => {
+      if (r.type === "no_match") {
+        return `
+        <div class="hiremeplz-field" style="opacity:0.5">
+          <div class="hiremeplz-field-label">${escapeHtml(r.label || r.field_id)}</div>
+          <div class="hiremeplz-field-value"><span style="color:#9ca3af;font-size:12px">No matching story found</span></div>
+          <div class="hiremeplz-field-conf">--</div>
+        </div>`;
+      }
+
       const isTextarea = r.type === "open_ended";
+      const storyInfo = r.sourceStoryTitle
+        ? `<div style="font-size:11px;color:#6b7280;margin-bottom:4px">From: ${escapeHtml(r.sourceStoryTitle)}${r.matchScore != null ? ` (${(r.matchScore * 100).toFixed(0)}%)` : ""}</div>`
+        : "";
       const valueHtml = isTextarea
-        ? `<textarea data-index="${i}" class="hiremeplz-input" rows="3">${escapeHtml(r.value || "")}</textarea>`
+        ? `${storyInfo}<textarea data-index="${i}" class="hiremeplz-input" rows="3">${escapeHtml(r.value || "")}</textarea>`
         : `<input type="text" value="${escapeHtml(r.value || "")}" data-index="${i}" class="hiremeplz-input" />`;
 
       return `
@@ -259,7 +275,7 @@ async function fetchLLMAnswers(): Promise<void> {
 
 async function fillAllFields(): Promise<void> {
   for (const result of matchResults) {
-    if (!result.value || !result.element) continue;
+    if (!result.value || !result.element || result.type === "no_match") continue;
 
     writeValue(result.element, result.value);
 
@@ -280,7 +296,7 @@ async function fillAllFields(): Promise<void> {
     const token = await getStorageValue("hiremeplz-token");
     if (token) {
       const persistedSuggestions = matchResults
-        .filter((r) => r.value && r.source !== "none")
+        .filter((r) => r.value && r.source !== "none" && r.type !== "no_match")
         .map((r) => ({
           fieldId: r.field_id,
           label: r.label,
@@ -288,9 +304,11 @@ async function fillAllFields(): Promise<void> {
           confidence: r.confidence,
           value: r.value || "",
           reasoning:
-            r.source === "llm"
-              ? "Generated from story library and profile context"
-              : `Matched from profile key: ${r.profileKey || "unknown"}`,
+            r.source === "story_match"
+              ? `Matched from story: ${r.sourceStoryTitle || "unknown"}`
+              : r.source === "llm"
+                ? "Generated from story library and profile context"
+                : `Matched from profile key: ${r.profileKey || "unknown"}`,
         }));
 
       await fetch(`${apiUrl}/api/autofill/record`, {
@@ -402,9 +420,15 @@ function toMatchResults(
       element: field.element,
       type: suggestion.kind,
       label: suggestion.label || field.label || field.name || field.id,
-      value: suggestion.value,
+      value: suggestion.value || null,
       confidence: suggestion.confidence,
-      source: suggestion.kind === "open_ended" ? "llm" : "rule_match",
+      source: suggestion.kind === "open_ended"
+        ? "story_match"
+        : suggestion.kind === "no_match"
+          ? "none"
+          : "rule_match",
+      sourceStoryTitle: suggestion.sourceStoryTitle,
+      matchScore: suggestion.matchScore,
     });
   }
 
