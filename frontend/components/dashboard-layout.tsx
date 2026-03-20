@@ -9,7 +9,6 @@ const navItems = [
   { href: "/dashboard/profile", label: "Profile" },
   { href: "/dashboard/experiences", label: "Experiences" },
   { href: "/dashboard/stories", label: "Story Library" },
-  { href: "/dashboard/answer-memory", label: "Answer Memory" },
   { href: "/dashboard/applications", label: "Applications" },
   { href: "/dashboard/jobs", label: "Job Matches" },
   { href: "/dashboard/jobs/subscriptions", label: "Subscriptions" },

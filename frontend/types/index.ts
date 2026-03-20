@@ -36,12 +36,8 @@ export type Experience = {
 export type Story = {
   id: string;
   title: string;
-  category: string;
-  promptTags: string[];
-  situation: string;
-  task?: string | null;
-  action: string;
-  result: string;
+  tags: string[];
+  content: string;
 };
 
 export type Application = {
@@ -115,15 +111,3 @@ export type JobIngestionRun = {
   errorMessage?: string | null;
 };
 
-export type AnswerMemory = {
-  id: string;
-  questionHash: string;
-  companyKey: string;
-  roleKey: string;
-  question: string;
-  answer: string;
-  hitCount: number;
-  lastUsedAt: string;
-  createdAt: string;
-  updatedAt: string;
-};
