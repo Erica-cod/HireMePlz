@@ -35,6 +35,13 @@ spec:
                   key: POSTGRES_PASSWORD
             - name: DATABASE_URL
               value: "postgresql://postgres:$(POSTGRES_PASSWORD)@postgres-svc:5432/hiremeplz?schema=public"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
       containers:
         - name: backend
           image: ghcr.io/erica-cod/hiremeplz/backend:latest

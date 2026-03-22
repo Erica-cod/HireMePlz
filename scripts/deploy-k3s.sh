@@ -29,7 +29,7 @@ warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
 # ---------- Parameter validation ----------
 : "${DOMAIN:?DOMAIN is required (e.g. hiremeplz.yourdomain.com)}"
 : "${API_DOMAIN:?API_DOMAIN is required (e.g. api.hiremeplz.yourdomain.com)}"
-: "${EMAIL:?EMAIL is required (for Let's Encrypt certificate)}"
+: "${EMAIL:?EMAIL is required (for Lets Encrypt certificate)}"
 : "${GHCR_USER:?GHCR_USER is required (GitHub username)}"
 : "${GHCR_TOKEN:?GHCR_TOKEN is required (GitHub PAT with packages:read)}"
 : "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
