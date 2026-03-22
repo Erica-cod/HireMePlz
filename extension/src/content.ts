@@ -535,12 +535,44 @@ if (document.readyState === "loading") {
   startup();
 }
 
-// ─── MutationObserver — catch new form fields injected by SPAs ────────────────
+// ─── Field-identity polling — catch show/hide SPA form switches ───────────────
+// Some SPAs (e.g. Amazon Jobs multi-step form) reveal new sections by toggling
+// CSS display/class without adding/removing DOM nodes.  A MutationObserver on
+// childList won't fire in that case.  Instead we poll the visible field set
+// every 1.5 s and rescan when it changes.
+
+let lastFieldSignature = "";
+let pollScanInProgress = false;
+
+function getFieldSignature(): string {
+  const fields = collectPageFields();
+  // Only include visible, enabled fields
+  const visible = fields.filter((f) => {
+    const el = f.element as HTMLElement;
+    return el.offsetParent !== null; // falsy when display:none or ancestor hidden
+  });
+  return visible.map((f) => f.id + ":" + f.type).sort().join("|");
+}
+
+setInterval(() => {
+  if (!isApplicationPage()) return;
+  if (pollScanInProgress) return;
+
+  const sig = getFieldSignature();
+  if (sig === "" || sig === lastFieldSignature) return;
+
+  lastFieldSignature = sig;
+  pollScanInProgress = true;
+  matchResults = [];
+  clearExtensionUi();
+  void initWithRetry().finally(() => { pollScanInProgress = false; });
+}, 1500);
+
+// ─── MutationObserver — catch new form fields *added* to the DOM ──────────────
 
 let observerDebounce: ReturnType<typeof setTimeout> | null = null;
 
 const formObserver = new MutationObserver((mutations) => {
-  // Only react when new form-relevant nodes appear
   const hasNewFields = mutations.some((m) =>
     Array.from(m.addedNodes).some((node) => {
       if (!(node instanceof Element)) return false;
