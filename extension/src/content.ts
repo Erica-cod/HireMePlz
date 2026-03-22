@@ -370,8 +370,12 @@ async function requestSuggestions(
       const errorText = await res.text().catch(() => "");
       console.error(`[HireMePlz] API error ${res.status}: ${errorText}`);
       if (res.status === 401) {
-        apiError = "Token expired — please re-login via extension popup";
+        apiError = "Session expired — please log in again at hiremeplz.info";
+        // Clear from extension storage
         await chrome.storage.local.remove(["hiremeplz-token", "hiremeplz-email"]);
+        // Also clear from website localStorage so the stale token is not
+        // immediately re-synced back, which would create an infinite loop.
+        window.localStorage.removeItem("hiremeplz-token");
       } else {
         apiError = `Server error (${res.status})`;
       }
@@ -489,7 +493,9 @@ async function initWithRetry(attempts = 5, delay = 1500): Promise<void> {
 
 async function syncTokenFromFrontend() {
   const host = window.location.hostname;
-  if (host !== "localhost" && !host.endsWith(".hiremeplz.com")) return;
+  const isLocal = host === "localhost";
+  const isProd = host === "hiremeplz.info" || host.endsWith(".hiremeplz.info");
+  if (!isLocal && !isProd) return;
 
   const token = window.localStorage.getItem("hiremeplz-token");
   if (!token) return;
@@ -497,10 +503,12 @@ async function syncTokenFromFrontend() {
   const stored = await chrome.storage.local.get("hiremeplz-token");
   if (stored["hiremeplz-token"] === token) return;
 
-  const apiUrl =
-    window.location.port === "3000"
-      ? `${window.location.protocol}//${host}:4000`
-      : `${window.location.protocol}//${host}`;
+  let apiUrl: string;
+  if (isLocal) {
+    apiUrl = `http://localhost:4000`;
+  } else {
+    apiUrl = `https://api.hiremeplz.info`;
+  }
 
   await chrome.storage.local.set({
     "hiremeplz-token": token,

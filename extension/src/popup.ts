@@ -88,7 +88,10 @@ async function handleLogin() {
     return;
   }
 
-  const apiUrl = await getStorage("hiremeplz-api-url", "http://localhost:4000");
+  // Use the value currently shown in the input field, falling back to storage
+  const apiUrl = apiUrlInput.value.trim() || await getStorage("hiremeplz-api-url", "http://localhost:4000");
+  // Persist whatever URL was used so future calls are consistent
+  await setStorage({ "hiremeplz-api-url": apiUrl });
 
   try {
     const endpoint =
@@ -104,7 +107,9 @@ async function handleLogin() {
     const data = await res.json();
 
     if (!res.ok) {
-      showMsg(loginMsg, data.message || "Login failed", "error");
+      const msg = data.message || "Login failed";
+      // Show URL in error so user can confirm which server was hit
+      showMsg(loginMsg, `${msg} (server: ${apiUrl})`, "error");
       return;
     }
 
@@ -154,5 +159,21 @@ logoutBtn.addEventListener("click", async () => {
   await chrome.storage.local.remove(["hiremeplz-token", "hiremeplz-email"]);
   init();
 });
+
+// Manual token save (dist popup.html uses save-btn + token input)
+const saveBtnEl = document.getElementById("save-btn");
+const tokenInputEl = document.getElementById("token") as HTMLInputElement | null;
+if (saveBtnEl && tokenInputEl) {
+  saveBtnEl.addEventListener("click", async () => {
+    const apiUrl = apiUrlInput.value.trim() || "http://localhost:4000";
+    const token = tokenInputEl.value.trim();
+    await setStorage({ "hiremeplz-api-url": apiUrl });
+    if (token) {
+      await setStorage({ "hiremeplz-token": token });
+    }
+    checkServer(apiUrl);
+    setTimeout(() => init(), 300);
+  });
+}
 
 init();
