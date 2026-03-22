@@ -40,6 +40,10 @@ JSEARCH_API_KEY="${JSEARCH_API_KEY:-}"
 ADZUNA_APP_ID="${ADZUNA_APP_ID:-}"
 ADZUNA_APP_KEY="${ADZUNA_APP_KEY:-}"
 SENDGRID_API_KEY="${SENDGRID_API_KEY:-}"
+DO_SPACES_KEY="${DO_SPACES_KEY:-}"
+DO_SPACES_SECRET="${DO_SPACES_SECRET:-}"
+DO_SPACES_BUCKET="${DO_SPACES_BUCKET:-}"
+DO_SPACES_REGION="${DO_SPACES_REGION:-tor1}"
 
 SERVER_IP=$(curl -s ifconfig.me)
 info "Server public IP: $SERVER_IP"
@@ -181,6 +185,16 @@ fi
 if [ -n "$SENDGRID_API_KEY" ]; then
   sed -i "s|SENDGRID_API_KEY: \"\"|SENDGRID_API_KEY: \"${SENDGRID_API_KEY}\"|g" "$K8S_DIR/secret.yaml"
 fi
+if [ -n "$DO_SPACES_KEY" ]; then
+  sed -i "s|replace-me-spaces-access-key|${DO_SPACES_KEY}|g" "$K8S_DIR/secret.yaml"
+fi
+if [ -n "$DO_SPACES_SECRET" ]; then
+  sed -i "s|replace-me-spaces-secret-key|${DO_SPACES_SECRET}|g" "$K8S_DIR/secret.yaml"
+fi
+if [ -n "$DO_SPACES_BUCKET" ]; then
+  sed -i "s|replace-me-bucket-name|${DO_SPACES_BUCKET}|g" "$K8S_DIR/secret.yaml"
+fi
+sed -i "s|DO_SPACES_REGION: \"nyc3\"|DO_SPACES_REGION: \"${DO_SPACES_REGION}\"|g" "$K8S_DIR/secret.yaml"
 
 info "Configuration updated with actual values"
 

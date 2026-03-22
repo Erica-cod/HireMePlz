@@ -119,6 +119,21 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/hiremeplz?schema=public
       REDIS_URL: redis://redis:6379
 
+  db-backup:
+    build:
+      context: ./scripts/backup
+    container_name: hiremeplz-db-backup
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: postgres
+      AWS_ACCESS_KEY_ID: ${DO_SPACES_KEY}
+      AWS_SECRET_ACCESS_KEY: ${DO_SPACES_SECRET}
+      DO_SPACES_BUCKET: ${DO_SPACES_BUCKET}
+      DO_SPACES_REGION: ${DO_SPACES_REGION}
+
   # ---- 监控栈 ----
 
   prometheus:

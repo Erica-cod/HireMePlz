@@ -1,0 +1,79 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: hiremeplz
+  labels:
+    app.kubernetes.io/name: postgres-backup
+    app.kubernetes.io/part-of: hiremeplz
+spec:
+  schedule: "0 2 * * *"  # Daily at 2:00 AM UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: postgres-backup
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: backup
+              image: postgres:16-alpine
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -e
+
+                  apk add --no-cache aws-cli > /dev/null 2>&1
+
+                  TIMESTAMP=$(date -u +%Y%m%d-%H%M%S)
+                  BACKUP_FILE="/tmp/hiremeplz-${TIMESTAMP}.sql.gz"
+                  S3_KEY="backups/hiremeplz-${TIMESTAMP}.sql.gz"
+                  ENDPOINT="https://${DO_SPACES_REGION}.digitaloceanspaces.com"
+
+                  echo "[$(date -u)] Starting PostgreSQL backup..."
+                  pg_dump -h postgres-svc -U postgres hiremeplz | gzip > "${BACKUP_FILE}"
+                  echo "[$(date -u)] Dump complete, uploading to DO Spaces..."
+
+                  aws s3 cp "${BACKUP_FILE}" "s3://${DO_SPACES_BUCKET}/${S3_KEY}" \
+                    --endpoint-url "${ENDPOINT}"
+
+                  echo "[$(date -u)] Backup uploaded: ${S3_KEY}"
+                  rm -f "${BACKUP_FILE}"
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: hiremeplz-secret
+                      key: POSTGRES_PASSWORD
+                - name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: hiremeplz-secret
+                      key: DO_SPACES_KEY
+                - name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: hiremeplz-secret
+                      key: DO_SPACES_SECRET
+                - name: DO_SPACES_BUCKET
+                  valueFrom:
+                    secretKeyRef:
+                      name: hiremeplz-secret
+                      key: DO_SPACES_BUCKET
+                - name: DO_SPACES_REGION
+                  valueFrom:
+                    secretKeyRef:
+                      name: hiremeplz-secret
+                      key: DO_SPACES_REGION
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi

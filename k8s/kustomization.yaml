@@ -33,6 +33,8 @@ resources:
   - network-policy.yaml
   # Ingress
   - ingress.yaml
+  # Backup
+  - backup/cronjob.yaml
 
 labels:
   - pairs:
