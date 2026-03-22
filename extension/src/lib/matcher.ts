@@ -4,6 +4,7 @@ import type { PageField } from "./detectors";
 export type MatchResult = {
   field_id: string;
   element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+  radioGroup?: HTMLInputElement[];
   type: "structured" | "open_ended" | "no_match" | "unmatched";
   label: string;
   value: string | null;
@@ -31,14 +32,25 @@ export function matchFields(
       .join(" ")
       .toLowerCase();
 
-    // Skip if field already has a value (except selects)
-    if (field.element.value && field.type !== "select") {
+    // Skip text/textarea fields that already have a value
+    if (
+      field.element.value &&
+      field.type !== "select" &&
+      field.type !== "radio" &&
+      field.type !== "checkbox"
+    ) {
       continue;
     }
 
-    let matched = false;
+    // Skip already-checked checkboxes
+    if (
+      field.type === "checkbox" &&
+      (field.element as HTMLInputElement).checked
+    ) {
+      continue;
+    }
 
-    // Check if it's an open-ended question
+    // Open-ended textarea → let LLM answer
     if (
       field.tagName === "TEXTAREA" &&
       field.label &&
@@ -56,23 +68,29 @@ export function matchFields(
       continue;
     }
 
-    // Try rule-based matching
+    let matched = false;
+
+    // Rule-based matching
     for (const [pattern, profileKey] of FIELD_RULES) {
       if (pattern.test(searchText)) {
         const value = getProfileValue(profileData, profileKey);
         if (value !== null && value !== undefined && value !== "") {
-          results.push({
-            field_id: field.id,
-            element: field.element,
-            type: "structured",
-            label: field.label || field.name || field.id,
-            value: String(value),
-            confidence: 0.9,
-            source: "rule_match",
-            profileKey,
-          });
-          matched = true;
-          break;
+          const resolvedValue = resolveValueForField(field, String(value));
+          if (resolvedValue !== null) {
+            results.push({
+              field_id: field.id,
+              element: field.element,
+              radioGroup: field.radioGroup,
+              type: "structured",
+              label: field.label || field.name || field.id,
+              value: resolvedValue,
+              confidence: 0.9,
+              source: "rule_match",
+              profileKey,
+            });
+            matched = true;
+            break;
+          }
         }
       }
     }
@@ -81,6 +99,7 @@ export function matchFields(
       results.push({
         field_id: field.id,
         element: field.element,
+        radioGroup: field.radioGroup,
         type: "unmatched",
         label: field.label || field.name || field.id,
         value: null,
@@ -91,6 +110,37 @@ export function matchFields(
   }
 
   return results;
+}
+
+/**
+ * For radio groups, verify that the profile value actually matches one of the
+ * options (or a normalised version of it).  Returns null if no option matches
+ * so the field is skipped rather than filled with a wrong value.
+ */
+function resolveValueForField(
+  field: PageField,
+  value: string
+): string | null {
+  if (field.type === "radio" && field.options && field.radioGroup) {
+    const n = norm(value);
+    const match = field.options.find((opt) => {
+      const on = norm(opt);
+      return on === n || on.startsWith(n) || n.startsWith(on);
+    });
+    // Return the option label as-is (writeValue normalises again)
+    return match ?? null;
+  }
+
+  // Checkboxes: any non-empty profile value is meaningful
+  if (field.type === "checkbox") {
+    return value;
+  }
+
+  return value;
+}
+
+function norm(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 function getProfileValue(

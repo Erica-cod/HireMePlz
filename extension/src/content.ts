@@ -277,13 +277,16 @@ async function fillAllFields(): Promise<void> {
   for (const result of matchResults) {
     if (!result.value || !result.element || result.type === "no_match") continue;
 
-    writeValue(result.element, result.value);
+    writeValue(result.element, result.value, result.radioGroup);
 
-    // Visual feedback
-    result.element.style.outline = "2px solid #3b82f6";
-    setTimeout(() => {
-      result.element.style.outline = "";
-    }, 2000);
+    // Visual feedback (skip for radio/checkbox — outline on hidden input is invisible)
+    const el = result.element as HTMLInputElement;
+    if (el.type !== "radio" && el.type !== "checkbox") {
+      result.element.style.outline = "2px solid #3b82f6";
+      setTimeout(() => {
+        result.element.style.outline = "";
+      }, 2000);
+    }
   }
 
   // Record application
@@ -518,25 +521,82 @@ async function syncTokenFromFrontend() {
   console.log("[HireMePlz] Token synced from frontend");
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => {
-    void syncTokenFromFrontend();
-    void initWithRetry();
-  });
-} else {
+// ─── Startup ──────────────────────────────────────────────────────────────────
+
+function startup() {
   void syncTokenFromFrontend();
   void initWithRetry();
+  startFormObserver();
 }
 
-chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName !== "local") {
-    return;
-  }
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", startup);
+} else {
+  startup();
+}
 
-  if (
-    changes["hiremeplz-token"] ||
-    changes["hiremeplz-api-url"]
-  ) {
+// ─── MutationObserver — catch new form fields injected by SPAs ────────────────
+
+let observerDebounce: ReturnType<typeof setTimeout> | null = null;
+
+const formObserver = new MutationObserver((mutations) => {
+  // Only react when new form-relevant nodes appear
+  const hasNewFields = mutations.some((m) =>
+    Array.from(m.addedNodes).some((node) => {
+      if (!(node instanceof Element)) return false;
+      return (
+        node.matches("input, select, textarea, fieldset") ||
+        node.querySelector("input, select, textarea, fieldset") !== null
+      );
+    })
+  );
+  if (!hasNewFields) return;
+
+  if (observerDebounce) clearTimeout(observerDebounce);
+  observerDebounce = setTimeout(() => {
+    matchResults = [];
+    clearExtensionUi();
+    void initWithRetry();
+  }, 400);
+});
+
+function startFormObserver() {
+  if (document.body) {
+    formObserver.observe(document.body, { childList: true, subtree: true });
+  }
+}
+
+// ─── SPA navigation — hashchange / pushState / popstate ───────────────────────
+
+function onSpaNavigate() {
+  if (observerDebounce) clearTimeout(observerDebounce);
+  matchResults = [];
+  clearExtensionUi();
+  // Give the SPA a moment to render the new view before scanning
+  setTimeout(() => void initWithRetry(), 300);
+}
+
+window.addEventListener("popstate", onSpaNavigate);
+window.addEventListener("hashchange", onSpaNavigate);
+
+// Intercept history.pushState / replaceState (used by React Router etc.)
+(function patchHistory() {
+  const wrap = (original: typeof history.pushState) =>
+    function (this: History, ...args: Parameters<typeof history.pushState>) {
+      const result = original.apply(this, args);
+      window.dispatchEvent(new Event("pushstate"));
+      return result;
+    };
+  history.pushState = wrap(history.pushState);
+  history.replaceState = wrap(history.replaceState);
+})();
+window.addEventListener("pushstate", onSpaNavigate);
+
+// ─── Storage changes (login/logout) ──────────────────────────────────────────
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "local") return;
+  if (changes["hiremeplz-token"] || changes["hiremeplz-api-url"]) {
     matchResults = [];
     clearExtensionUi();
     void initWithRetry();
