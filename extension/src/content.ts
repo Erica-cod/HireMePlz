@@ -535,38 +535,58 @@ if (document.readyState === "loading") {
   startup();
 }
 
-// ─── Field-identity polling — catch show/hide SPA form switches ───────────────
-// Some SPAs (e.g. Amazon Jobs multi-step form) reveal new sections by toggling
-// CSS display/class without adding/removing DOM nodes.  A MutationObserver on
-// childList won't fire in that case.  Instead we poll the visible field set
-// every 1.5 s and rescan when it changes.
+// ─── Field-identity tracking — detect SPA form switches ──────────────────────
+// Amazon Jobs and similar SPAs reveal new sections by toggling CSS
+// display/visibility without changing the URL or adding DOM nodes.
+// Strategy: fast signature of *rendered* fields (getBoundingClientRect),
+// checked after every click (sidebar nav) and as a 1s backup poll.
 
 let lastFieldSignature = "";
-let pollScanInProgress = false;
+let spaRescanPending = false;
 
-function getFieldSignature(): string {
-  const fields = collectPageFields();
-  // Only include visible, enabled fields
-  const visible = fields.filter((f) => {
-    const el = f.element as HTMLElement;
-    return el.offsetParent !== null; // falsy when display:none or ancestor hidden
+/**
+ * Fast visible-field signature — no shadow DOM traversal, no label detection.
+ * Uses getBoundingClientRect to detect truly rendered (non-zero-size) fields.
+ */
+function getVisibleFieldSignature(): string {
+  const els = document.querySelectorAll<HTMLElement>(
+    'input:not([type="hidden"]):not([type="submit"])' +
+    ':not([type="button"]):not([type="file"]),' +
+    "textarea, select"
+  );
+  const sig: string[] = [];
+  els.forEach((el) => {
+    if ((el as HTMLInputElement).disabled) return;
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) return; // hidden / off-screen
+    const id = el.id || el.getAttribute("name") || el.tagName;
+    const type = (el as HTMLInputElement).type || el.tagName;
+    sig.push(`${id}:${type}`);
   });
-  return visible.map((f) => f.id + ":" + f.type).sort().join("|");
+  return sig.sort().join("|");
 }
 
-setInterval(() => {
+function maybeTriggerRescan() {
   if (!isApplicationPage()) return;
-  if (pollScanInProgress) return;
-
-  const sig = getFieldSignature();
+  if (spaRescanPending) return;
+  const sig = getVisibleFieldSignature();
   if (sig === "" || sig === lastFieldSignature) return;
-
   lastFieldSignature = sig;
-  pollScanInProgress = true;
+  spaRescanPending = true;
   matchResults = [];
   clearExtensionUi();
-  void initWithRetry().finally(() => { pollScanInProgress = false; });
-}, 1500);
+  void initWithRetry().finally(() => { spaRescanPending = false; });
+}
+
+// Fire after any click (sidebar nav, Next/Back buttons, tabs, etc.)
+let clickDebounce: ReturnType<typeof setTimeout> | null = null;
+document.addEventListener("click", () => {
+  if (clickDebounce) clearTimeout(clickDebounce);
+  clickDebounce = setTimeout(maybeTriggerRescan, 600);
+}, true);
+
+// Backup poll every 1 s for cases where no click is involved
+setInterval(maybeTriggerRescan, 1000);
 
 // ─── MutationObserver — catch new form fields *added* to the DOM ──────────────
 
