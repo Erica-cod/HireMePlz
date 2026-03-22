@@ -13,13 +13,13 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - hiremeplz.example.com
-        - api.hiremeplz.example.com
-        - grafana.hiremeplz.example.com
+        - hiremeplz.info
+        - api.hiremeplz.info
+        - grafana.hiremeplz.info
       secretName: hiremeplz-tls
   rules:
-    # Frontend: hiremeplz.example.com
-    - host: hiremeplz.example.com
+    # Frontend: hiremeplz.info
+    - host: hiremeplz.info
       http:
         paths:
           - path: /
@@ -29,8 +29,8 @@ spec:
                 name: frontend-svc
                 port:
                   number: 3000
-    # Backend API: api.hiremeplz.example.com
-    - host: api.hiremeplz.example.com
+    # Backend API: api.hiremeplz.info
+    - host: api.hiremeplz.info
       http:
         paths:
           - path: /
@@ -40,8 +40,8 @@ spec:
                 name: backend-svc
                 port:
                   number: 4000
-    # Grafana dashboard: grafana.hiremeplz.example.com
-    - host: grafana.hiremeplz.example.com
+    # Grafana dashboard: grafana.hiremeplz.info
+    - host: grafana.hiremeplz.info
       http:
         paths:
           - path: /

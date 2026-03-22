@@ -25,6 +25,7 @@ resources:
   - monitoring/grafana.yaml
   - monitoring/loki.yaml
   - monitoring/promtail.yaml
+  - monitoring/dashboards.yaml
   # Autoscaling
   - hpa.yaml
   # Availability
