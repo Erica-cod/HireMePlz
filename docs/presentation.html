@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HireMePlz — ECE1779 Project Presentation</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --accent: #3b82f6;
+    --accent2: #8b5cf6;
+    --green: #22c55e;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --border: #334155;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+  }
+  .slide {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    padding: 48px 72px;
+    text-align: center;
+  }
+  .slide.active { display: flex; }
+  .slide.left { text-align: left; align-items: flex-start; }
+
+  h1 { font-size: 3.4rem; font-weight: 800; margin-bottom: 16px; line-height: 1.2; }
+  h2 { font-size: 2.4rem; font-weight: 700; margin-bottom: 28px; color: var(--accent); }
+  h3 { font-size: 1.5rem; font-weight: 600; margin-bottom: 14px; color: var(--accent2); }
+  p, li { font-size: 1.45rem; line-height: 1.65; }
+  li { margin-bottom: 8px; }
+  ul { list-style: none; padding: 0; }
+  ul li::before { content: "▸ "; color: var(--accent); font-weight: bold; }
+  .muted { color: var(--muted); font-size: 1.15rem; }
+  .tag {
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 4px;
+  }
+  .tag-blue { background: rgba(59,130,246,.2); color: #93c5fd; border: 1px solid rgba(59,130,246,.3); }
+  .tag-green { background: rgba(34,197,94,.2); color: #86efac; border: 1px solid rgba(34,197,94,.3); }
+  .tag-purple { background: rgba(139,92,246,.2); color: #c4b5fd; border: 1px solid rgba(139,92,246,.3); }
+  .tag-orange { background: rgba(245,158,11,.2); color: #fcd34d; border: 1px solid rgba(245,158,11,.3); }
+
+  .highlight { color: var(--accent); font-weight: 700; }
+  .highlight-green { color: var(--green); font-weight: 700; }
+  .highlight-purple { color: var(--accent2); font-weight: 700; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    text-align: left;
+  }
+  .card h3 { margin-bottom: 10px; }
+  .card li { font-size: 1.15rem; }
+
+  .arch-diagram {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    max-width: 1100px;
+    margin-top: 8px;
+  }
+  .arch-row {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .arch-box {
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    text-align: center;
+    min-width: 120px;
+  }
+  .arch-box.user { background: #1e3a5f; border: 2px solid #3b82f6; }
+  .arch-box.app { background: #1e293b; border: 2px solid #8b5cf6; }
+  .arch-box.infra { background: #1a2e1a; border: 2px solid #22c55e; }
+  .arch-box.monitor { background: #2d1f0e; border: 2px solid #f59e0b; }
+  .arch-arrow { font-size: 1.6rem; color: var(--muted); line-height: 1; }
+
+  .code-block {
+    background: #0d1117;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 24px;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 1.05rem;
+    line-height: 1.55;
+    text-align: left;
+    overflow-x: auto;
+    width: 100%;
+    max-width: 900px;
+  }
+  .code-block .comment { color: #6a737d; }
+  .code-block .keyword { color: #ff7b72; }
+  .code-block .string { color: #a5d6ff; }
+  .code-block .number { color: #79c0ff; }
+
+  .progress-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    transition: width 0.3s;
+    z-index: 100;
+  }
+  .slide-counter {
+    position: fixed;
+    bottom: 16px;
+    right: 24px;
+    font-size: 1rem;
+    color: var(--muted);
+    z-index: 100;
+  }
+  .nav-hint {
+    position: fixed;
+    bottom: 16px;
+    left: 24px;
+    font-size: 0.9rem;
+    color: var(--muted);
+    opacity: 0.5;
+    z-index: 100;
+  }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; width: 100%; align-items: start; }
+  .section-badge {
+    display: inline-block;
+    padding: 5px 16px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .badge-core { background: rgba(59,130,246,.15); color: #60a5fa; }
+  .badge-adv { background: rgba(139,92,246,.15); color: #a78bfa; }
+  .badge-demo { background: rgba(34,197,94,.15); color: #4ade80; }
+
+  .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; width: 100%; }
+  .feature-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    text-align: left;
+  }
+  .feature-card h3 { font-size: 1.3rem; margin-bottom: 8px; }
+  .feature-card p { font-size: 1.05rem; color: var(--muted); line-height: 1.5; }
+  .feature-card .icon { font-size: 1.8rem; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+
+<!-- ==================== SLIDE 1: Title ==================== -->
+<div class="slide active" id="s1">
+  <div style="margin-bottom: 20px;">
+    <span class="tag tag-blue">ECE1779 Winter 2026</span>
+    <span class="tag tag-purple">Course Project</span>
+  </div>
+  <h1 style="font-size: 4.2rem;">HireMePlz</h1>
+  <p style="font-size: 1.8rem; color: var(--muted); margin-top: 12px;">AI-Powered Job Application Assistant</p>
+  <div style="margin-top: 48px;">
+    <p class="muted" style="font-size: 1.3rem;">Team Members: [Your Names Here]</p>
+    <p class="muted">March 2026</p>
+  </div>
+</div>
+
+<!-- ==================== SLIDE 2: Project Overview ==================== -->
+<div class="slide left" id="s2">
+  <span class="section-badge badge-demo">PROJECT OVERVIEW</span>
+  <h2>What is HireMePlz?</h2>
+  <div class="two-col">
+    <div>
+      <h3>Problem</h3>
+      <ul>
+        <li>Job seekers repeatedly fill similar application forms</li>
+        <li>Hard to tailor personal stories per application</li>
+        <li>No centralized way to track applications &amp; matches</li>
+      </ul>
+      <h3 style="margin-top: 20px;">Target Users</h3>
+      <p>Students and professionals actively job hunting</p>
+    </div>
+    <div>
+      <h3>Key Features</h3>
+      <ul>
+        <li><span class="highlight">Profile Management</span> &mdash; education, experience, story library</li>
+        <li><span class="highlight-purple">Smart Autofill</span> &mdash; Chrome extension + LLM suggestions</li>
+        <li><span class="highlight-green">Job Matching</span> &mdash; automated scraping &amp; scoring</li>
+        <li>Application history tracking</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SLIDE 3: Architecture ==================== -->
+<div class="slide" id="s3">
+  <span class="section-badge badge-core">SYSTEM ARCHITECTURE</span>
+  <h2>High-Level Architecture</h2>
+  <div class="arch-diagram">
+    <div class="arch-row">
+      <div class="arch-box user">Web Browser<br><small>hiremeplz.info</small></div>
+      <div class="arch-box user">Chrome Extension</div>
+    </div>
+    <div class="arch-arrow">&#8595; HTTPS (Let's Encrypt) &#8595;</div>
+    <div class="arch-row">
+      <div class="arch-box" style="background:#1a1a3e;border:2px solid #6366f1;">Nginx Ingress Controller<br><small>TLS termination + routing</small></div>
+    </div>
+    <div class="arch-arrow">&#8595;</div>
+    <div class="arch-row">
+      <div class="arch-box app">Frontend<br><small>Next.js</small></div>
+      <div class="arch-box app">Backend (&times;2)<br><small>Express + Prisma</small></div>
+      <div class="arch-box app">Worker<br><small>Job scraping</small></div>
+      <div class="arch-box app">Worker-LLM<br><small>AI autofill</small></div>
+    </div>
+    <div class="arch-arrow">&#8595;</div>
+    <div class="arch-row">
+      <div class="arch-box infra">PostgreSQL 16<br><small>StatefulSet + PVC 5Gi</small></div>
+      <div class="arch-box infra">Redis 7<br><small>BullMQ queues</small></div>
+    </div>
+    <div class="arch-row" style="margin-top: 12px;">
+      <div class="arch-box monitor">Prometheus</div>
+      <div class="arch-box monitor">Grafana</div>
+      <div class="arch-box monitor">Loki + Promtail</div>
+    </div>
+  </div>
+  <p class="muted" style="margin-top: 10px;">11 containers &mdash; deployed on DigitalOcean via Kubernetes</p>
+</div>
+
+<!-- ==================== SLIDE 4: Docker + Multi-Container + Stateful ==================== -->
+<div class="slide left" id="s4">
+  <span class="section-badge badge-core">CORE REQUIREMENTS</span>
+  <h2>Docker, Multi-Container &amp; Stateful Design</h2>
+  <div class="two-col">
+    <div>
+      <h3>11 Containers Working Together</h3>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px;">
+        <span class="tag tag-purple">frontend</span>
+        <span class="tag tag-purple">backend</span>
+        <span class="tag tag-purple">worker</span>
+        <span class="tag tag-purple">worker-llm</span>
+        <span class="tag tag-green">postgres</span>
+        <span class="tag tag-green">redis</span>
+        <span class="tag tag-orange">prometheus</span>
+        <span class="tag tag-orange">grafana</span>
+        <span class="tag tag-orange">loki</span>
+        <span class="tag tag-orange">promtail</span>
+        <span class="tag tag-blue">db-backup</span>
+      </div>
+      <ul>
+        <li>Each service has its own <span class="highlight">Dockerfile</span></li>
+        <li><span class="highlight">Docker Compose</span> for local one-command startup</li>
+        <li>Health checks enforce startup ordering</li>
+      </ul>
+    </div>
+    <div>
+      <h3>How State Survives Restarts</h3>
+      <ul>
+        <li><span class="highlight">PostgreSQL</span> stores all user data, jobs, applications</li>
+        <li>Runs as a <span class="highlight">StatefulSet</span> with a <span class="highlight">5 Gi PVC</span></li>
+        <li>Data persists across pod restarts and redeployments</li>
+        <li><span class="highlight">Redis</span> as BullMQ message broker for async tasks</li>
+        <li>Daily backup to <span class="highlight">DigitalOcean Spaces</span></li>
+      </ul>
+      <div class="code-block" style="font-size: 0.9rem; margin-top: 12px;">
+<span class="keyword">kind</span>: StatefulSet
+<span class="keyword">volumeClaimTemplates</span>:
+  - <span class="keyword">spec</span>:
+      <span class="keyword">accessModes</span>: [<span class="string">"ReadWriteOnce"</span>]
+      <span class="keyword">storage</span>: <span class="number">5Gi</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SLIDE 5: Kubernetes Orchestration ==================== -->
+<div class="slide left" id="s5">
+  <span class="section-badge badge-core">CORE REQUIREMENT</span>
+  <h2>Kubernetes Orchestration</h2>
+  <div class="two-col">
+    <div>
+      <h3>Deployed on DigitalOcean</h3>
+      <ul>
+        <li><span class="highlight">Kustomize</span> manages all K8s manifests</li>
+        <li>Backend: <span class="highlight">2 replicas</span> with RollingUpdate</li>
+        <li>InitContainer runs DB migration on deploy</li>
+        <li>Readiness &amp; liveness probes on every service</li>
+        <li>Resource requests &amp; limits defined</li>
+      </ul>
+      <h3 style="margin-top: 16px;">Ingress Routing (3 domains)</h3>
+      <ul>
+        <li><span class="highlight">hiremeplz.info</span> &rarr; Frontend</li>
+        <li><span class="highlight">api.hiremeplz.info</span> &rarr; Backend API</li>
+        <li><span class="highlight">grafana.hiremeplz.info</span> &rarr; Grafana</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Terminal Demo (kubectl)</h3>
+      <div class="code-block" style="font-size: 0.92rem;">
+<span class="comment"># All pod running status</span>
+$ <span class="keyword">kubectl</span> get pods -n hiremeplz
+
+<span class="comment"># Deployments &amp; replica counts</span>
+$ <span class="keyword">kubectl</span> get deployments -n hiremeplz
+
+<span class="comment"># Persistent volume claims</span>
+$ <span class="keyword">kubectl</span> get pvc -n hiremeplz
+
+<span class="comment"># Horizontal pod autoscaler status</span>
+$ <span class="keyword">kubectl</span> get hpa -n hiremeplz
+
+<span class="comment"># Ingress routing rules</span>
+$ <span class="keyword">kubectl</span> get ingress -n hiremeplz
+      </div>
+      <p class="muted" style="margin-top: 10px;">&rarr; Switch to terminal for live demo</p>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SLIDE 6: Monitoring ==================== -->
+<div class="slide left" id="s6">
+  <span class="section-badge badge-core">CORE REQUIREMENT</span>
+  <h2>Monitoring &amp; Observability</h2>
+  <div class="two-col">
+    <div>
+      <h3>Monitoring Stack</h3>
+      <ul>
+        <li><span class="highlight">Prometheus</span> &mdash; metrics collection (15-day retention)</li>
+        <li><span class="highlight-purple">Grafana</span> &mdash; dashboards &amp; visualization</li>
+        <li><span class="highlight-green">Loki + Promtail</span> &mdash; centralized log aggregation</li>
+      </ul>
+      <h3 style="margin-top: 16px;">Custom Alert Rules</h3>
+      <ul style="font-size: 1.2rem;">
+        <li>CPU / memory usage exceeds threshold</li>
+        <li>5xx error rate &gt; 5%</li>
+        <li>P95 latency &gt; 2 seconds</li>
+        <li>Queue backlog / failed jobs</li>
+        <li>V8 heap memory &amp; event loop lag</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Grafana Dashboard Panels</h3>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div class="card" style="padding: 12px 18px;">
+          <span class="tag tag-blue" style="font-size: 0.8rem;">TIME SERIES</span>
+          Request rate (req/s) &middot; Latency percentiles (P50/P90/P99)
+        </div>
+        <div class="card" style="padding: 12px 18px;">
+          <span class="tag tag-green" style="font-size: 0.8rem;">STATUS</span>
+          5xx error rate &middot; Concurrent requests in flight
+        </div>
+        <div class="card" style="padding: 12px 18px;">
+          <span class="tag tag-orange" style="font-size: 0.8rem;">RUNTIME</span>
+          Event loop lag &middot; Heap memory usage
+        </div>
+        <div class="card" style="padding: 12px 18px;">
+          <span class="tag tag-purple" style="font-size: 0.8rem;">QUEUES / ROUTES</span>
+          Queue status &middot; Top 10 routes by rate &middot; RSS memory
+        </div>
+      </div>
+      <p class="muted" style="margin-top: 10px;">&rarr; Switch to grafana.hiremeplz.info for live demo</p>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SLIDE 7: Advanced Features ==================== -->
+<div class="slide" id="s7">
+  <span class="section-badge badge-adv">ADVANCED FEATURES</span>
+  <h2>4 Advanced Features Implemented</h2>
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="icon">&#9889;</div>
+      <h3>Auto-Scaling &amp; High Availability</h3>
+      <p>HPA: Backend scales 2 &rarr; 5 replicas at 70% CPU<br>
+         Worker-LLM scales 1 &rarr; 3 replicas<br>
+         PDB ensures min 1 pod during rolling updates</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">&#128274;</div>
+      <h3>Security Enhancements</h3>
+      <p>HTTPS via cert-manager + Let's Encrypt<br>
+         JWT authentication + bcrypt password hashing<br>
+         K8s NetworkPolicy for least-privilege access</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">&#128260;</div>
+      <h3>CI/CD Pipeline</h3>
+      <p>GitHub Actions: type-check &rarr; build &rarr; push to GHCR<br>
+         Matrix build for 4 services on every push<br>
+         Watchtower auto-pulls new images &amp; restarts</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">&#128190;</div>
+      <h3>Automated Backup &amp; Recovery</h3>
+      <p>K8s CronJob runs daily at 02:00 UTC<br>
+         pg_dump &rarr; gzip &rarr; upload to DO Spaces<br>
+         Retains last 3 backup history</p>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SLIDE 8: CI/CD Flow ==================== -->
+<div class="slide left" id="s8">
+  <span class="section-badge badge-adv">ADVANCED FEATURE DETAIL</span>
+  <h2>CI/CD Pipeline &amp; Automated Deployment</h2>
+  <div class="two-col">
+    <div>
+      <h3>CI: Triggered on Every Push / PR</h3>
+      <div class="code-block" style="font-size: 0.9rem;">
+<span class="comment"># .github/workflows/ci.yml</span>
+<span class="keyword">steps</span>:
+  - Checkout code
+  - Setup Node.js <span class="number">22</span>
+  - npm install
+  - Prisma generate + db push
+  - <span class="string">Type check (tsc --noEmit)</span>
+  - <span class="string">Build all packages</span>
+      </div>
+      <h3 style="margin-top: 16px;">CD: Build &amp; Push Images</h3>
+      <div class="code-block" style="font-size: 0.9rem;">
+<span class="comment"># docker-publish.yml</span>
+<span class="keyword">matrix</span>: backend, frontend,
+        worker, worker-llm
+&rarr; Docker Buildx + push to <span class="string">ghcr.io</span>
+&rarr; Watchtower detects &amp; updates
+      </div>
+    </div>
+    <div>
+      <h3>Deployment Flow</h3>
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div class="card" style="padding: 14px; border-left: 4px solid var(--accent);">
+          <strong>1.</strong> Developer pushes to <span class="highlight">main</span> branch
+        </div>
+        <div style="text-align: center; color: var(--muted); font-size: 1.2rem;">&#8595;</div>
+        <div class="card" style="padding: 14px; border-left: 4px solid var(--accent2);">
+          <strong>2.</strong> GitHub Actions builds <span class="highlight-purple">4 Docker images</span>
+        </div>
+        <div style="text-align: center; color: var(--muted); font-size: 1.2rem;">&#8595;</div>
+        <div class="card" style="padding: 14px; border-left: 4px solid var(--green);">
+          <strong>3.</strong> Pushes to <span class="highlight-green">GHCR</span> (GitHub Container Registry)
+        </div>
+        <div style="text-align: center; color: var(--muted); font-size: 1.2rem;">&#8595;</div>
+        <div class="card" style="padding: 14px; border-left: 4px solid var(--orange);">
+          <strong>4.</strong> Watchtower auto-pulls &amp; <span class="highlight" style="color: var(--orange);">rolling restarts</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SLIDE 9: Summary ==================== -->
+<div class="slide" id="s9">
+  <h2>Summary</h2>
+  <div style="max-width: 920px;">
+    <h3 style="color: var(--accent); margin-bottom: 18px; font-size: 1.6rem;">Core Technical Requirements &mdash; All 6 Fulfilled</h3>
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 32px;">
+      <span class="tag tag-blue" style="font-size: 1.05rem; padding: 8px 18px;">Docker Containerization</span>
+      <span class="tag tag-green" style="font-size: 1.05rem; padding: 8px 18px;">PostgreSQL + PVC</span>
+      <span class="tag tag-purple" style="font-size: 1.05rem; padding: 8px 18px;">Kubernetes Orchestration</span>
+      <span class="tag tag-orange" style="font-size: 1.05rem; padding: 8px 18px;">Prometheus + Grafana</span>
+      <span class="tag tag-blue" style="font-size: 1.05rem; padding: 8px 18px;">11-Container Architecture</span>
+      <span class="tag tag-green" style="font-size: 1.05rem; padding: 8px 18px;">Stateful Design</span>
+    </div>
+    <h3 style="color: var(--accent2); margin-bottom: 18px; font-size: 1.6rem;">4 Advanced Features Implemented</h3>
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 32px;">
+      <span class="tag tag-purple" style="font-size: 1.05rem; padding: 8px 18px;">Auto-Scaling + HA</span>
+      <span class="tag tag-blue" style="font-size: 1.05rem; padding: 8px 18px;">HTTPS + JWT + NetworkPolicy</span>
+      <span class="tag tag-green" style="font-size: 1.05rem; padding: 8px 18px;">Fully Automated CI/CD</span>
+      <span class="tag tag-orange" style="font-size: 1.05rem; padding: 8px 18px;">Daily Automated Backup</span>
+    </div>
+    <p style="font-size: 1.5rem; margin-top: 16px;">
+      <span class="highlight">hiremeplz.info</span>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <span class="highlight-purple">grafana.hiremeplz.info</span>
+      &nbsp;&nbsp;|&nbsp;&nbsp;
+      <span class="highlight-green">github.com/Erica-cod/HireMePlz</span>
+    </p>
+    <p style="font-size: 2.2rem; margin-top: 36px; font-weight: 700;">Thank You!</p>
+  </div>
+</div>
+
+<!-- ==================== Navigation ==================== -->
+<div class="progress-bar" id="progress"></div>
+<div class="slide-counter" id="counter"></div>
+<div class="nav-hint">Arrow keys to navigate &nbsp;|&nbsp; F for fullscreen</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  let current = 0;
+
+  function show(n) {
+    slides[current].classList.remove('active');
+    current = Math.max(0, Math.min(n, slides.length - 1));
+    slides[current].classList.add('active');
+    document.getElementById('progress').style.width =
+      ((current + 1) / slides.length * 100) + '%';
+    document.getElementById('counter').textContent =
+      (current + 1) + ' / ' + slides.length;
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+      e.preventDefault(); show(current + 1);
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+      e.preventDefault(); show(current - 1);
+    }
+    if (e.key === 'Home') { e.preventDefault(); show(0); }
+    if (e.key === 'End') { e.preventDefault(); show(slides.length - 1); }
+    if (e.key === 'f' || e.key === 'F') {
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+      else document.exitFullscreen();
+    }
+  });
+
+  document.addEventListener('click', e => {
+    if (e.clientX > window.innerWidth / 2) show(current + 1);
+    else show(current - 1);
+  });
+
+  show(0);
+</script>
+</body>
+</html>
