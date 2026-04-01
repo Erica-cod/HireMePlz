@@ -209,12 +209,19 @@
       <h3>Key Features</h3>
       <ul>
         <li><span class="highlight">Profile Management</span> &mdash; education, experience, story library</li>
-        <li><span class="highlight-purple">Smart Autofill</span> &mdash; Chrome extension + LLM suggestions</li>
-        <li><span class="highlight-green">Job Matching</span> &mdash; automated scraping &amp; scoring</li>
+        <li><span class="highlight">Smart Autofill</span> &mdash; Chrome extension + LLM suggestions</li>
+        <li><span class="highlight">Job Matching</span> &mdash; automated scraping &amp; scoring</li>
         <li>Application history tracking</li>
       </ul>
     </div>
   </div>
+</div>
+
+<!-- ==================== SLIDE 2.5: App Demo Video ==================== -->
+<div class="slide" id="s-demo">
+  <h2>App Demo</h2>
+  <video src="Demo.MOV" controls style="max-width: 85%; max-height: 65vh; border-radius: 12px;"></video>
+  <span class="section-badge badge-demo" style="margin-top: 12px;">RECORDED DEMO</span>
 </div>
 
 <!-- ==================== SLIDE 3: Architecture ==================== -->
@@ -226,7 +233,7 @@
       <div class="arch-box user">Web Browser<br><small>hiremeplz.info</small></div>
       <div class="arch-box user">Chrome Extension</div>
     </div>
-    <div class="arch-arrow">&#8595; HTTPS (Let's Encrypt) &#8595;</div>
+    <div class="arch-arrow">&#8595; HTTPS &#8595;</div>
     <div class="arch-row">
       <div class="arch-box" style="background:#1a1a3e;border:2px solid #6366f1;">Nginx Ingress Controller<br><small>TLS termination + routing</small></div>
     </div>
@@ -241,6 +248,7 @@
     <div class="arch-row">
       <div class="arch-box infra">PostgreSQL 16<br><small>StatefulSet + PVC 5Gi</small></div>
       <div class="arch-box infra">Redis 7<br><small>BullMQ queues</small></div>
+      <div class="arch-box infra">DB Backup<br><small>CronJob &#8594; DO Spaces</small></div>
     </div>
     <div class="arch-row" style="margin-top: 12px;">
       <div class="arch-box monitor">Prometheus</div>
@@ -248,7 +256,7 @@
       <div class="arch-box monitor">Loki + Promtail</div>
     </div>
   </div>
-  <p class="muted" style="margin-top: 10px;">11 containers &mdash; deployed on DigitalOcean via Kubernetes</p>
+  <p class="muted" style="margin-top: 10px;">11 services &mdash; deployed on DigitalOcean via Kubernetes</p>
 </div>
 
 <!-- ==================== SLIDE 4: Docker + Multi-Container + Stateful ==================== -->
@@ -278,7 +286,7 @@
       </ul>
     </div>
     <div>
-      <h3>How State Survives Restarts</h3>
+      <h3>Persistent Storage</h3>
       <ul>
         <li><span class="highlight">PostgreSQL</span> stores all user data, jobs, applications</li>
         <li>Runs as a <span class="highlight">StatefulSet</span> with a <span class="highlight">5 Gi PVC</span></li>
@@ -341,6 +349,13 @@ $ <span class="keyword">kubectl</span> get ingress -n hiremeplz
   </div>
 </div>
 
+<!-- ==================== SLIDE 5.5: K8s Demo Video ==================== -->
+<div class="slide" id="s-k8s">
+  <h2>Kubernetes on DigitalOcean</h2>
+  <video src="k8s.mp4" controls style="max-width: 85%; max-height: 65vh; border-radius: 12px;"></video>
+  <span class="section-badge badge-core" style="margin-top: 12px;">K8S DEMO</span>
+</div>
+
 <!-- ==================== SLIDE 6: Monitoring ==================== -->
 <div class="slide left" id="s6">
   <span class="section-badge badge-core">CORE REQUIREMENT</span>
@@ -382,7 +397,6 @@ $ <span class="keyword">kubectl</span> get ingress -n hiremeplz
           Queue status &middot; Top 10 routes by rate &middot; RSS memory
         </div>
       </div>
-      <p class="muted" style="margin-top: 10px;">&rarr; Switch to grafana.hiremeplz.info for live demo</p>
     </div>
   </div>
 </div>
@@ -393,29 +407,25 @@ $ <span class="keyword">kubectl</span> get ingress -n hiremeplz
   <h2>4 Advanced Features Implemented</h2>
   <div class="feature-grid">
     <div class="feature-card">
-      <div class="icon">&#9889;</div>
-      <h3>Auto-Scaling &amp; High Availability</h3>
+      <h3>&#9889; Auto-Scaling &amp; High Availability</h3>
       <p>HPA: Backend scales 2 &rarr; 5 replicas at 70% CPU<br>
          Worker-LLM scales 1 &rarr; 3 replicas<br>
          PDB ensures min 1 pod during rolling updates</p>
     </div>
     <div class="feature-card">
-      <div class="icon">&#128274;</div>
-      <h3>Security Enhancements</h3>
+      <h3>&#128274; Security Enhancements</h3>
       <p>HTTPS via cert-manager + Let's Encrypt<br>
          JWT authentication + bcrypt password hashing<br>
          K8s NetworkPolicy for least-privilege access</p>
     </div>
     <div class="feature-card">
-      <div class="icon">&#128260;</div>
-      <h3>CI/CD Pipeline</h3>
+      <h3>&#128260; CI/CD Pipeline</h3>
       <p>GitHub Actions: type-check &rarr; build &rarr; push to GHCR<br>
          Matrix build for 4 services on every push<br>
          Watchtower auto-pulls new images &amp; restarts</p>
     </div>
     <div class="feature-card">
-      <div class="icon">&#128190;</div>
-      <h3>Automated Backup &amp; Recovery</h3>
+      <h3>&#128190; Automated Backup &amp; Recovery</h3>
       <p>K8s CronJob runs daily at 02:00 UTC<br>
          pg_dump &rarr; gzip &rarr; upload to DO Spaces<br>
          Retains last 3 backup history</p>
@@ -476,7 +486,7 @@ $ <span class="keyword">kubectl</span> get ingress -n hiremeplz
 <div class="slide" id="s9">
   <h2>Summary</h2>
   <div style="max-width: 920px;">
-    <h3 style="color: var(--accent); margin-bottom: 18px; font-size: 1.6rem;">Core Technical Requirements &mdash; All 6 Fulfilled</h3>
+    <h3 style="color: var(--accent); margin-bottom: 18px; font-size: 1.6rem;">Core Technical Requirements &mdash; All Fulfilled</h3>
     <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 32px;">
       <span class="tag tag-blue" style="font-size: 1.05rem; padding: 8px 18px;">Docker Containerization</span>
       <span class="tag tag-green" style="font-size: 1.05rem; padding: 8px 18px;">PostgreSQL + PVC</span>
@@ -489,8 +499,8 @@ $ <span class="keyword">kubectl</span> get ingress -n hiremeplz
     <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 32px;">
       <span class="tag tag-purple" style="font-size: 1.05rem; padding: 8px 18px;">Auto-Scaling + HA</span>
       <span class="tag tag-blue" style="font-size: 1.05rem; padding: 8px 18px;">HTTPS + JWT + NetworkPolicy</span>
-      <span class="tag tag-green" style="font-size: 1.05rem; padding: 8px 18px;">Fully Automated CI/CD</span>
-      <span class="tag tag-orange" style="font-size: 1.05rem; padding: 8px 18px;">Daily Automated Backup</span>
+      <span class="tag tag-green" style="font-size: 1.05rem; padding: 8px 18px;">CI/CD Pipeline</span>
+      <span class="tag tag-orange" style="font-size: 1.05rem; padding: 8px 18px;">Automated Backup</span>
     </div>
     <p style="font-size: 1.5rem; margin-top: 16px;">
       <span class="highlight">hiremeplz.info</span>
