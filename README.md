@@ -6,7 +6,7 @@
 |------|---------------|-------|
 | Yushun Tang | *(fill in)* | *(fill in)* |
 | Keyin Liang | *(fill in)* | *(fill in)* |
-| Zhengyang Li | *(fill in)* | *(fill in)* |
+| Zhengyang Li | 1012373977 | zhengyang.li@mail.utoronto.ca |
 | Irys Zhang | *(fill in)* | *(fill in)* |
 
 > **GitHub Repository:** [github.com/Erica-cod/HireMePlz](https://github.com/Erica-cod/HireMePlz)
