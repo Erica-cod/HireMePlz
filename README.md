@@ -4,10 +4,10 @@
 
 | Name | Student Number | Email |
 |------|---------------|-------|
-| Yushun Tang | *(fill in)* | *(fill in)* |
-| Keyin Liang | *(fill in)* | *(fill in)* |
-| Zhengyang Li | 1012373977 | zhengyang.li@mail.utoronto.ca |
-| Irys Zhang | *(fill in)* | *(fill in)* |
+| Yushun Tang | *1011561962* | *yushun.tang@mail.utoronto.ca* |
+| Keyin Liang | *1005932788* | *keryn.liang@mail.utoronto.ca* |
+| Zhengyang Li | *1012373977* | *zhengyang.li@mail.utoronto.ca* |
+| Irys Zhang | *1012794424* | *irys.zhang@mail.utoronto.ca* |
 
 > **GitHub Repository:** [github.com/Erica-cod/HireMePlz](https://github.com/Erica-cod/HireMePlz)
 
