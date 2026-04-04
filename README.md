@@ -15,7 +15,7 @@
 
 ## Video Demo
 
-*(Insert video URL here — YouTube, Google Drive, or Dropbox link)*
+*https://youtu.be/c6bGw6RSZ30*
 
 ---
 
