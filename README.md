@@ -23,7 +23,7 @@
 
 Job hunting is one of the most stressful and repetitive tasks for students and early-career professionals. Applicants routinely face the same challenges: filling in identical personal information across dozens of job portals, crafting tailored responses to behavioral questions, and keeping track of which jobs they have applied to. Existing tools like LinkedIn Easy Apply only work within a single platform, and generic form-fillers (e.g., browser autofill) cannot handle open-ended questions or match a candidate's personal stories to specific prompts.
 
-**HireMePlz** addresses this gap by providing a centralized platform where users manage their profile, work experiences, and a library of personal stories. A Chrome extension detects form fields on any job application page and leverages a large language model (LLM) to generate tailored suggestions for both structured fields (name, email, school) and open-ended prompts (e.g., "Tell us about a time you demonstrated leadership"). Additionally, an automated job scraping and matching pipeline recommends relevant positions based on user preferences, saving time and improving application quality.
+**HireMePlz** addresses this gap by providing a centralized platform where users manage their profile, work experiences, and a library of personal stories. A Chrome extension detects form fields on any job application page and returns profile-based suggestions for structured fields (name, email, school) and story-matched draft responses for open-ended prompts (e.g., "Tell us about a time you demonstrated leadership"), with LLM assistance used for relevance scoring and option selection. Additionally, an automated job scraping and matching pipeline recommends relevant positions based on user preferences, saving time and improving application quality.
 
 **Target Users:** University students and professionals actively seeking internships or full-time positions who apply to multiple companies across different platforms.
 
@@ -51,8 +51,8 @@ The primary objective of HireMePlz is to build a production-grade, cloud-native 
 | **Chrome Extension** | Manifest V3, esbuild, TypeScript |
 | **Database** | PostgreSQL 16 |
 | **Message Queue** | Redis 7 (BullMQ) |
-| **Orchestration** | **Kubernetes** (DigitalOcean Managed Kubernetes) |
-| **Deployment** | DigitalOcean Kubernetes, Kustomize manifests |
+| **Orchestration** | **Kubernetes** (single-node k3s) |
+| **Deployment** | DigitalOcean Droplet, k3s, Kustomize manifests |
 | **Ingress & TLS** | Nginx Ingress Controller, cert-manager + Let's Encrypt |
 | **Monitoring** | Prometheus v3.2.1, Grafana 11.5.2, Loki 3.4.2, Promtail 3.4.2 |
 | **CI/CD** | GitHub Actions (CI + Docker image publishing to GHCR) |
@@ -87,7 +87,7 @@ The database schema (managed via Prisma) includes 11 models: `User`, `Profile`, 
 
 #### 3. Kubernetes Orchestration
 
-All services are deployed to **DigitalOcean Managed Kubernetes** using **Kustomize**. Key orchestration features include:
+All services are deployed to a **single-node k3s Kubernetes cluster on a DigitalOcean Droplet** using **Kustomize**. Key orchestration features include:
 
 - **Backend:** 2 replicas with `RollingUpdate` strategy (`maxSurge: 1`, `maxUnavailable: 0`) for zero-downtime deploys
 - **InitContainer:** Runs `prisma db push` on every deployment to apply schema migrations automatically
@@ -129,7 +129,6 @@ A full observability stack is deployed alongside the application:
 
 - **CI (`ci.yml`):** Triggered on every push to `main` and all pull requests. Spins up a PostgreSQL 16 service container, installs dependencies, generates Prisma client, pushes the schema, runs `tsc --noEmit` type checking across all packages, and builds all services.
 - **CD (`docker-publish.yml`):** On push to `main` or version tags, a matrix job builds and pushes Docker images for 4 services (`backend`, `frontend`, `worker`, `worker-llm`) to **GitHub Container Registry (GHCR)** using Docker Buildx with GitHub Actions cache.
-- **Auto-deployment:** Watchtower runs in the cluster, automatically detecting new images on GHCR and performing rolling restarts — enabling a fully automated push-to-deploy workflow.
 
 #### 4. Automated Backup & Recovery
 
@@ -161,14 +160,14 @@ Navigate to **Dashboard → Profile** to fill in your personal information:
 
 ### 4. Story Library
 
-Navigate to **Dashboard → Stories** to build a library of personal stories (e.g., leadership examples, technical challenges, teamwork scenarios). Each story has a title, content, and tags for easy retrieval. The LLM uses these stories to generate tailored responses for open-ended application questions.
+Navigate to **Dashboard → Stories** to build a library of personal stories (e.g., leadership examples, technical challenges, teamwork scenarios). Each story has a title, content, and tags for easy retrieval. The autofill pipeline uses these stories to retrieve the most relevant draft response for open-ended application questions.
 
 ### 5. Smart Autofill (Chrome Extension)
 
-1. Install the HireMePlz Chrome extension (load unpacked from `extension/dist/`).
+1. Build the extension with `npm run build --workspace extension`, then install it in Chrome by loading the unpacked `extension/` folder.
 2. Navigate to any job application page.
 3. The extension's content script scans the page for form fields, detects structured fields (name, email, phone) and open-ended prompts.
-4. Click the extension popup to trigger autofill — the backend retrieves your profile and stories, sends them to the LLM worker, and returns field-by-field suggestions.
+4. Click the extension popup to trigger autofill — the backend retrieves your profile and stories, matches structured fields from profile data, scores story relevance for open-ended prompts, and returns field-by-field suggestions.
 5. Review and confirm suggestions before they are filled into the page.
 6. The application is automatically recorded in your application history.
 
@@ -234,7 +233,7 @@ Build the Chrome extension:
 npm run build --workspace extension
 ```
 
-Then load the `extension/dist/` folder as an unpacked extension in Chrome.
+Then load the unpacked `extension/` folder in Chrome.
 
 ### Local Development (With Docker)
 
@@ -311,15 +310,11 @@ HireMePlz/
 └── .env.example
 ```
 
-### Credentials
-
-Credentials have been sent to the TA via email.
-
 ---
 
 ## Deployment Information
 
-The application is deployed on **DigitalOcean Managed Kubernetes** and accessible at:
+The application is deployed on a **DigitalOcean Droplet running single-node k3s** and accessible at:
 
 | Service | URL |
 |---------|-----|
@@ -329,12 +324,12 @@ The application is deployed on **DigitalOcean Managed Kubernetes** and accessibl
 
 ### Deployment Architecture
 
-All services run in the `hiremeplz` namespace on a DigitalOcean Kubernetes cluster. Kustomize manages all manifests under the `k8s/` directory. The deployment flow is:
+All services run in the `hiremeplz` namespace on a DigitalOcean Droplet running a single-node k3s Kubernetes cluster. Kustomize manages all manifests under the `k8s/` directory. The deployment flow is:
 
 1. Developer pushes to `main` branch
 2. GitHub Actions builds 4 Docker images (backend, frontend, worker, worker-llm)
 3. Images are pushed to GitHub Container Registry (GHCR)
-4. Watchtower running in the cluster detects new images and performs rolling restarts
+4. The k3s cluster runs the published images using the manifests under `k8s/`
 
 TLS certificates are automatically managed by cert-manager with Let's Encrypt. Nginx Ingress Controller handles routing and TLS termination for all three domains.
 
@@ -369,10 +364,10 @@ See `ai-session.md` for detailed interaction records.
 
 | Team Member | Key Contributions |
 |------------|-------------------|
-| **Yushun Tang** | *(fill in: e.g., Backend API development, Prisma schema design, BullMQ queue architecture, Chrome extension autofill logic)* |
-| **Keyin Liang** | *(fill in: e.g., Frontend dashboard development with Next.js, user profile/experience/story management pages, responsive UI design)* |
-| **Zhengyang Li** | *(fill in: e.g., Kubernetes deployment manifests, Kustomize configuration, HPA/PDB/NetworkPolicy setup, DigitalOcean cluster management, Ingress and TLS configuration)* |
-| **Irys Zhang** | *(fill in: e.g., CI/CD pipeline with GitHub Actions, monitoring stack setup (Prometheus, Grafana, Loki), automated backup CronJob, worker services)* |
+| **Yushun Tang** | *Backend API development, Prisma schema design, BullMQ queue architecture, Chrome extension autofill logic* |
+| **Keyin Liang** | *Frontend dashboard development with Next.js, user profile/experience/story management pages, responsive UI design* |
+| **Zhengyang Li** | *Kubernetes deployment manifests, Kustomize configuration, HPA/PDB/NetworkPolicy setup, DigitalOcean cluster management, Ingress and TLS configuration* |
+| **Irys Zhang** | *CI/CD pipeline with GitHub Actions, monitoring stack setup (Prometheus, Grafana, Loki), automated backup CronJob, worker services* |
 
 > All contributions are reflected in the Git commit history. Each team member maintained regular, meaningful commits throughout the project timeline.
 
@@ -388,7 +383,7 @@ See `ai-session.md` for detailed interaction records.
 
 3. **Monitoring is essential, not optional:** Prometheus metrics and Grafana dashboards proved invaluable during debugging. For example, monitoring event loop lag helped us identify that the LLM worker needed its own deployment (rather than running in the backend process) to avoid blocking API requests.
 
-4. **CI/CD saves time exponentially:** The initial setup cost of GitHub Actions workflows paid for itself quickly. The matrix build strategy for 4 services and Watchtower-based auto-deployment meant that a simple `git push` resulted in a fully tested and deployed update within minutes.
+4. **CI/CD saves time exponentially:** The initial setup cost of GitHub Actions workflows paid for itself quickly. The matrix build strategy for 4 services made image publishing and deployment updates much faster and more reliable.
 
 ### Process Lessons
 
