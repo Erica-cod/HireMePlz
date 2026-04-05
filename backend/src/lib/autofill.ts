@@ -417,6 +417,18 @@ async function scoreStoriesByLLM(params: {
   }
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([
+    promise.then(
+      (v) => v,
+      () => null as T | null
+    ),
+    new Promise<null>((resolve) => {
+      setTimeout(() => resolve(null), ms);
+    })
+  ]);
+}
+
 export async function buildSuggestions(params: {
   userId: string;
   fields: AutofillFieldInput[];
@@ -429,49 +441,53 @@ export async function buildSuggestions(params: {
   role?: string;
 }) {
   const { company, educations, experiences, fields, profile, role, stories, userEmail, userId } = params;
-  const suggestions: AutofillSuggestion[] = [];
+  const n = fields.length;
+  const perFieldMs = env.LLM_JOB_TIMEOUT_MS;
+  const slotResults: (AutofillSuggestion | null)[] = new Array(n).fill(null);
+  const asyncTasks: Promise<void>[] = [];
 
-  for (const field of fields) {
+  for (let i = 0; i < n; i++) {
+    const field = fields[i];
+
     if (isOpenQuestion(field)) {
       const question =
         field.label || field.placeholder || field.nearbyText || field.name || "";
-
-      const match = await scoreStoriesByLLM({
-        userId,
-        question,
-        stories,
-        company,
-        role,
-      });
-
-      if (match) {
-        suggestions.push({
-          fieldId: field.id,
-          label: field.label || field.name || field.id,
-          kind: "open_ended",
-          confidence: match.score,
-          value: match.story.content,
-          reasoning: `Matched story: ${match.story.title} (score: ${match.score.toFixed(2)})`,
-          sourceStoryId: match.story.id,
-          sourceStoryTitle: match.story.title,
-          matchScore: match.score,
-        });
-      } else {
-        suggestions.push({
-          fieldId: field.id,
-          label: field.label || field.name || field.id,
-          kind: "no_match",
-          confidence: 0,
-          value: "",
-          reasoning: "No story matched above the relevance threshold",
-        });
-      }
-      continue;
-    }
-
-    const structured = scoreStructuredField(field, profile, educations, userEmail);
-    if (structured) {
-      suggestions.push(structured);
+      asyncTasks.push(
+        (async () => {
+          const match = await withTimeout(
+            scoreStoriesByLLM({
+              userId,
+              question,
+              stories,
+              company,
+              role
+            }),
+            perFieldMs
+          );
+          if (match) {
+            slotResults[i] = {
+              fieldId: field.id,
+              label: field.label || field.name || field.id,
+              kind: "open_ended",
+              confidence: match.score,
+              value: match.story.content,
+              reasoning: `Matched story: ${match.story.title} (score: ${match.score.toFixed(2)})`,
+              sourceStoryId: match.story.id,
+              sourceStoryTitle: match.story.title,
+              matchScore: match.score
+            };
+          } else {
+            slotResults[i] = {
+              fieldId: field.id,
+              label: field.label || field.name || field.id,
+              kind: "no_match",
+              confidence: 0,
+              value: "",
+              reasoning: "No story matched above the relevance threshold or timed out"
+            };
+          }
+        })()
+      );
       continue;
     }
 
@@ -486,40 +502,59 @@ export async function buildSuggestions(params: {
       });
 
       if (ruleAnswer) {
-        suggestions.push({
+        slotResults[i] = {
           fieldId: field.id,
           label: field.label || field.name || field.id,
           kind: "structured",
           confidence: 0.8,
           value: ruleAnswer,
           reasoning: "Matched by qualification question rules"
-        });
+        };
         continue;
       }
 
-      const llmAnswer = await answerSelectByLLM({
-        userId,
-        question,
-        options,
-        profile,
-        educations,
-        experiences,
-        company,
-        role
-      });
+      asyncTasks.push(
+        (async () => {
+          const llmAnswer = await withTimeout(
+            answerSelectByLLM({
+              userId,
+              question,
+              options,
+              profile,
+              educations,
+              experiences,
+              company,
+              role
+            }),
+            perFieldMs
+          );
+          if (llmAnswer) {
+            slotResults[i] = {
+              fieldId: field.id,
+              label: field.label || field.name || field.id,
+              kind: "structured",
+              confidence: 0.7,
+              value: llmAnswer,
+              reasoning: "Selected by LLM from available options"
+            };
+          }
+        })()
+      );
+      continue;
+    }
 
-      if (llmAnswer) {
-        suggestions.push({
-          fieldId: field.id,
-          label: field.label || field.name || field.id,
-          kind: "structured",
-          confidence: 0.7,
-          value: llmAnswer,
-          reasoning: "Selected by LLM from available options"
-        });
-      }
+    const structured = scoreStructuredField(field, profile, educations, userEmail);
+    if (structured) {
+      slotResults[i] = structured;
     }
   }
 
+  await Promise.all(asyncTasks);
+
+  const suggestions: AutofillSuggestion[] = [];
+  for (let i = 0; i < n; i++) {
+    const s = slotResults[i];
+    if (s) suggestions.push(s);
+  }
   return suggestions;
 }

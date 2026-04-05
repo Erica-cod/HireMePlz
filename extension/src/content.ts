@@ -48,12 +48,17 @@ const MOCK_PROFILE: Record<string, unknown> = {
 };
 // ===================================
 
+const STORAGE_FAB_HIDDEN = "hiremeplz-fab-hidden";
+
 let matchResults: MatchResult[] = [];
 let apiError = "";
 let autofillContext: { company: string; role: string } = {
   company: "",
   role: "",
 };
+let popupSessionFabEnabled = false;
+let inactiveReason: "no-fields" | null = null;
+let suggestionsLoading = false;
 
 type BackendSuggestion = {
   fieldId: string;
@@ -66,6 +71,19 @@ type BackendSuggestion = {
   sourceStoryTitle?: string;
   matchScore?: number;
 };
+
+type SuggestionCache = {
+  fieldIds: string;
+  suggestions: BackendSuggestion[];
+  apiError: string;
+  autofillContext: { company: string; role: string };
+};
+
+let suggestionCache: SuggestionCache | null = null;
+
+function fingerprintFields(fields: ReturnType<typeof collectPageFields>): string {
+  return fields.map((f) => f.id).join("\u0001");
+}
 
 function isApplicationPage(): boolean {
   const url = window.location.href.toLowerCase();
@@ -95,62 +113,173 @@ function isApplicationPage(): boolean {
   return patterns.some((p) => url.includes(p));
 }
 
-async function init(): Promise<void> {
-  if (!MOCK_MODE && !isApplicationPage()) return;
-
-  const fields = collectPageFields();
-  if (fields.length === 0) return;
-
-  if (MOCK_MODE) {
-    matchResults = matchFields(fields, MOCK_PROFILE);
-  } else {
-    const apiUrl = await getStorageValue(
-      "hiremeplz-api-url",
-      "http://localhost:4000"
-    );
-    const token = await getStorageValue("hiremeplz-token");
-    if (!token) return;
-
-    autofillContext = inferAutofillContext();
-    apiError = "";
-    const suggestions = await requestSuggestions(fields, apiUrl, token);
-    matchResults = toMatchResults(fields, suggestions);
-  }
-
-  if (matchResults.length === 0 && !apiError) return;
-
-  // In mock mode we still emulate delayed LLM completion.
-  if (MOCK_MODE && matchResults.some((r) => r.source === "llm_pending")) {
-    await fetchLLMAnswers();
-  }
-
-  showFloatingButton(matchResults.length, !!apiError);
-}
-
 async function getStorageValue(key: string, fallback = ""): Promise<string> {
   const result = await chrome.storage.local.get(key);
   return (result[key] as string | undefined) ?? fallback;
 }
 
-function showFloatingButton(fieldCount: number, hasError = false): void {
+async function isFabHiddenStorage(): Promise<boolean> {
+  const v = await getStorageValue(STORAGE_FAB_HIDDEN, "");
+  return v === "1";
+}
+
+async function hideFabFromPage(): Promise<void> {
+  await chrome.storage.local.set({ [STORAGE_FAB_HIDDEN]: "1" });
+  clearExtensionUi();
+}
+
+function mountFloatingChrome(opts: {
+  mode: "inactive" | "loading" | "active" | "error";
+  fieldCount?: number;
+}): void {
   document.getElementById("hiremeplz-fab")?.remove();
 
+  const wrap = document.createElement("div");
+  wrap.id = "hiremeplz-fab";
+  wrap.className = "hiremeplz-fab-wrap";
+
+  const inner = document.createElement("div");
+  inner.className = "hiremeplz-fab-inner";
+
+  const xBtn = document.createElement("button");
+  xBtn.type = "button";
+  xBtn.className = "hiremeplz-fab-x";
+  xBtn.setAttribute("aria-label", "Hide floating button");
+  xBtn.textContent = "\u00d7";
+  xBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    void hideFabFromPage();
+  });
+
   const btn = document.createElement("div");
-  btn.id = "hiremeplz-fab";
-  const label = hasError ? "HireMePlz ⚠" : "HireMePlz";
-  btn.innerHTML = `
-    <div id="hiremeplz-fab-btn" ${hasError ? 'style="background:#dc2626"' : ""}>
-      <span>${label}</span>
-      <span class="hiremeplz-badge">${fieldCount}</span>
-    </div>
-  `;
-  document.body.appendChild(btn);
-  btn.addEventListener("click", () => showPreviewPanel());
+  btn.id = "hiremeplz-fab-btn";
+  let label = "HireMePlz";
+  let badge = "";
+  if (opts.mode === "inactive") {
+    btn.classList.add("hiremeplz-fab-inactive");
+    badge = "\u2013";
+  } else if (opts.mode === "loading") {
+    btn.classList.add("hiremeplz-fab-loading");
+    btn.innerHTML = `<span>${label}</span><span class="hiremeplz-badge hiremeplz-badge-spinner" aria-label="Loading"><span class="hiremeplz-spinner hiremeplz-spinner-on-primary"></span></span>`;
+    btn.addEventListener("click", () => {
+      handleFabPrimaryClick();
+    });
+    inner.appendChild(btn);
+    inner.appendChild(xBtn);
+    wrap.appendChild(inner);
+    document.body.appendChild(wrap);
+    return;
+  } else if (opts.mode === "error") {
+    btn.style.background = "#dc2626";
+    label = "HireMePlz \u26a0";
+    badge = String(opts.fieldCount ?? 0);
+  } else {
+    badge = String(opts.fieldCount ?? 0);
+  }
+
+  btn.innerHTML = `<span>${label}</span><span class="hiremeplz-badge">${badge}</span>`;
+  btn.addEventListener("click", () => {
+    handleFabPrimaryClick();
+  });
+  inner.appendChild(btn);
+  inner.appendChild(xBtn);
+  wrap.appendChild(inner);
+  document.body.appendChild(wrap);
+}
+
+function handleFabPrimaryClick(): void {
+  document.getElementById("hiremeplz-inactive-panel")?.remove();
+  if (inactiveReason) {
+    showInactiveHelpPanel();
+    return;
+  }
+  showPreviewPanel();
+}
+
+function showInactiveHelpPanel(): void {
+  document.getElementById("hiremeplz-inactive-panel")?.remove();
+  const panel = document.createElement("div");
+  panel.id = "hiremeplz-inactive-panel";
+
+  panel.innerHTML = `
+      <p>No fillable fields were detected yet. The form may still be loading.</p>
+      <button type="button" id="hiremeplz-retry-fields">Retry scan</button>
+      <button type="button" id="hiremeplz-inactive-close" class="secondary">Close</button>`;
+
+  document.body.appendChild(panel);
+
+  document.getElementById("hiremeplz-retry-fields")?.addEventListener("click", () => {
+    panel.remove();
+    void initWithRetry();
+  });
+
+  document.getElementById("hiremeplz-inactive-close")?.addEventListener("click", () => {
+    panel.remove();
+  });
+}
+
+async function runAuthenticatedFlow(
+  fields: ReturnType<typeof collectPageFields>
+): Promise<void> {
+  const apiUrl = await getStorageValue("hiremeplz-api-url", "http://localhost:4000");
+  const token = await getStorageValue("hiremeplz-token");
+  if (!token) {
+    clearExtensionUi();
+    return;
+  }
+
+  autofillContext = inferAutofillContext();
+  apiError = "";
+  matchResults = [];
+  suggestionsLoading = true;
+  mountFloatingChrome({ mode: "loading" });
+
+  const suggestions = await requestSuggestions(fields, apiUrl, token);
+  suggestionsLoading = false;
+  matchResults = toMatchResults(fields, suggestions);
+
+  if (matchResults.length === 0 && !apiError) {
+    suggestionCache = null;
+    clearExtensionUi();
+    return;
+  }
+
+  suggestionCache = {
+    fieldIds: fingerprintFields(fields),
+    suggestions: suggestions.map((s) => ({ ...s })),
+    apiError,
+    autofillContext: { ...autofillContext }
+  };
+
+  mountFloatingChrome({
+    mode: apiError ? "error" : "active",
+    fieldCount: matchResults.length
+  });
+
+  if (document.getElementById("hiremeplz-panel")) {
+    showPreviewPanel();
+  }
+}
+
+async function runMockFabFlow(): Promise<void> {
+  const fields = collectPageFields();
+  if (fields.length === 0) return;
+  matchResults = matchFields(fields, MOCK_PROFILE);
+  if (matchResults.some((r) => r.source === "llm_pending")) {
+    await fetchLLMAnswers();
+  }
+  if (matchResults.length === 0 && !apiError) return;
+  mountFloatingChrome({
+    mode: "active",
+    fieldCount: matchResults.length
+  });
 }
 
 function clearExtensionUi(): void {
   document.getElementById("hiremeplz-fab")?.remove();
   document.getElementById("hiremeplz-panel")?.remove();
+  document.getElementById("hiremeplz-inactive-panel")?.remove();
 }
 
 function escapeHtml(str: string): string {
@@ -172,6 +301,23 @@ function showPreviewPanel(): void {
 
   const panel = document.createElement("div");
   panel.id = "hiremeplz-panel";
+
+  if (suggestionsLoading && matchResults.length === 0) {
+    panel.innerHTML = `
+    <div class="hiremeplz-panel-header">
+      <span>HireMePlz — Preview</span>
+      <button id="hiremeplz-close">&times;</button>
+    </div>
+    <div class="hiremeplz-panel-body hiremeplz-panel-loading">
+      <span class="hiremeplz-spinner hiremeplz-spinner-panel" aria-hidden="true"></span>
+      <span>Loading suggestions from the server\u2026</span>
+    </div>`;
+    document.body.appendChild(panel);
+    document
+      .getElementById("hiremeplz-close")!
+      .addEventListener("click", () => panel.remove());
+    return;
+  }
 
   const fieldsHtml = matchResults
     .map((r, i) => {
@@ -456,6 +602,46 @@ function toMatchResults(
   return results;
 }
 
+function tryRestoreFromCache(fields: ReturnType<typeof collectPageFields>): boolean {
+  if (!suggestionCache) return false;
+  if (fingerprintFields(fields) !== suggestionCache.fieldIds) return false;
+
+  matchResults = toMatchResults(fields, suggestionCache.suggestions);
+  apiError = suggestionCache.apiError;
+  autofillContext = { ...suggestionCache.autofillContext };
+  suggestionsLoading = false;
+  inactiveReason = null;
+
+  if (matchResults.length === 0 && !apiError) {
+    clearExtensionUi();
+    return true;
+  }
+
+  mountFloatingChrome({
+    mode: apiError ? "error" : "active",
+    fieldCount: matchResults.length
+  });
+
+  if (document.getElementById("hiremeplz-panel")) {
+    showPreviewPanel();
+  }
+  return true;
+}
+
+async function proceedAfterFieldsCollected(
+  fields: ReturnType<typeof collectPageFields>
+): Promise<void> {
+  if (fields.length === 0) {
+    inactiveReason = "no-fields";
+    mountFloatingChrome({ mode: "inactive" });
+    return;
+  }
+
+  inactiveReason = null;
+  if (tryRestoreFromCache(fields)) return;
+  await runAuthenticatedFlow(fields);
+}
+
 function inferAutofillContext(): { company: string; role: string } {
   const title = document.title.trim();
   const heading =
@@ -485,14 +671,54 @@ function inferAutofillContext(): { company: string; role: string } {
   return { company, role };
 }
 
-// Run on page load, with retries for dynamically rendered pages (Workday etc.)
 async function initWithRetry(attempts = 5, delay = 1500): Promise<void> {
-  for (let i = 0; i < attempts; i++) {
-    await init();
-    if (matchResults.length > 0) return;
-    await new Promise((r) => setTimeout(r, delay));
+  if (await isFabHiddenStorage()) {
+    clearExtensionUi();
+    return;
   }
+
+  if (MOCK_MODE) {
+    let mockFields = collectPageFields();
+    for (let i = 0; i < attempts && mockFields.length === 0; i++) {
+      if (i > 0) await new Promise((r) => setTimeout(r, delay));
+      mockFields = collectPageFields();
+    }
+    if (mockFields.length === 0) return;
+    await runMockFabFlow();
+    return;
+  }
+
+  const token = await getStorageValue("hiremeplz-token");
+  if (!token) {
+    clearExtensionUi();
+    return;
+  }
+
+  if (!isApplicationPage() && !popupSessionFabEnabled) {
+    clearExtensionUi();
+    return;
+  }
+
+  let fields = collectPageFields();
+  for (let i = 0; i < attempts && fields.length === 0; i++) {
+    if (i > 0) await new Promise((r) => setTimeout(r, delay));
+    fields = collectPageFields();
+  }
+
+  await proceedAfterFieldsCollected(fields);
 }
+
+chrome.runtime.onMessage.addListener(
+  (msg: { type?: string }, _sender, sendResponse) => {
+    if (msg?.type === "hiremeplz-activate-from-popup") {
+      popupSessionFabEnabled = true;
+      inactiveReason = null;
+      void initWithRetry();
+      sendResponse({ ok: true });
+    }
+    return true;
+  }
+);
 
 async function syncTokenFromFrontend() {
   const host = window.location.hostname;
@@ -648,7 +874,20 @@ window.addEventListener("pushstate", onSpaNavigate);
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== "local") return;
+
+  if (changes[STORAGE_FAB_HIDDEN]) {
+    if (changes[STORAGE_FAB_HIDDEN].newValue === "1") {
+      clearExtensionUi();
+    }
+    return;
+  }
+
   if (changes["hiremeplz-token"] || changes["hiremeplz-api-url"]) {
+    const tok = changes["hiremeplz-token"];
+    if (tok && (tok.newValue === undefined || tok.newValue === "")) {
+      popupSessionFabEnabled = false;
+    }
+    suggestionCache = null;
     matchResults = [];
     clearExtensionUi();
     void initWithRetry();

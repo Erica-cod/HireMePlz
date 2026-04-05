@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mock job application — HireMePlz extension test</title>
+    <style>
+      :root {
+        font-family: system-ui, sans-serif;
+        color: #111;
+        line-height: 1.5;
+      }
+      body {
+        max-width: 640px;
+        margin: 2rem auto;
+        padding: 0 1rem 4rem;
+      }
+      .banner {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-bottom: 1.5rem;
+        font-size: 14px;
+      }
+      h1 {
+        font-size: 1.35rem;
+        margin: 0 0 0.25rem;
+      }
+      .sub {
+        color: #64748b;
+        font-size: 14px;
+        margin-bottom: 1.5rem;
+      }
+      fieldset {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1.25rem;
+      }
+      legend {
+        font-weight: 600;
+        padding: 0 6px;
+      }
+      .field {
+        margin-bottom: 1rem;
+      }
+      .field:last-child {
+        margin-bottom: 0;
+      }
+      label {
+        display: block;
+        font-size: 13px;
+        font-weight: 500;
+        margin-bottom: 4px;
+      }
+      input[type="text"],
+      input[type="email"],
+      input[type="tel"],
+      textarea,
+      select {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        padding: 8px 10px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 14px;
+      }
+      textarea {
+        min-height: 120px;
+        resize: vertical;
+      }
+      .req {
+        color: #dc2626;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="banner">
+      Local mock page for the HireMePlz extension. Open this URL with Docker
+      frontend (e.g. <code>http://localhost:3000/application-mock.html</code>),
+      log in via extension popup, then use the floating HireMePlz button.
+    </div>
+
+    <h1>Software Engineer — Example Corp</h1>
+    <p class="sub">Remote friendly · Full-time · application (mock)</p>
+
+    <form id="mock-application-form" action="#" method="get" autocomplete="on">
+      <fieldset>
+        <legend>Contact</legend>
+        <div class="field">
+          <label for="first_name">First Name <span class="req">*</span></label>
+          <input
+            id="first_name"
+            name="first_name"
+            type="text"
+            required
+            autocomplete="given-name"
+          />
+        </div>
+        <div class="field">
+          <label for="last_name">Last Name <span class="req">*</span></label>
+          <input
+            id="last_name"
+            name="last_name"
+            type="text"
+            required
+            autocomplete="family-name"
+          />
+        </div>
+        <div class="field">
+          <label for="email">Email Address <span class="req">*</span></label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            required
+            autocomplete="email"
+          />
+        </div>
+        <div class="field">
+          <label for="phone">Phone</label>
+          <input
+            id="phone"
+            name="phone"
+            type="tel"
+            autocomplete="tel"
+          />
+        </div>
+        <div class="field">
+          <label for="linkedin">LinkedIn Profile</label>
+          <input
+            id="linkedin"
+            name="linkedin"
+            type="text"
+            placeholder="https://linkedin.com/in/..."
+          />
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Education (structured)</legend>
+        <div class="field">
+          <label for="school_name">School or University</label>
+          <input id="school_name" name="school_name" type="text" />
+        </div>
+        <div class="field">
+          <label for="degree_type">Degree</label>
+          <input id="degree_type" name="degree_type" type="text" />
+        </div>
+        <div class="field">
+          <label for="field_of_study">Field of Study / Major</label>
+          <input id="field_of_study" name="field_of_study" type="text" />
+        </div>
+        <div class="field">
+          <label for="graduation_year">Expected Graduation Year</label>
+          <input id="graduation_year" name="graduation_year" type="text" />
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Open-ended (story match)</legend>
+        <div class="field">
+          <label for="challenge_story">
+            Please describe a challenging technical project or situation you faced
+            and explain how you approached and resolved it.
+            <span class="req">*</span>
+          </label>
+          <textarea
+            id="challenge_story"
+            name="challenge_story"
+            required
+            rows="6"
+          ></textarea>
+        </div>
+        <div class="field">
+          <label for="why_company">
+            Tell us why you are interested in this role and what you hope to contribute.
+          </label>
+          <textarea id="why_company" name="why_company" rows="5"></textarea>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Multiple choice (rules / LLM)</legend>
+        <div class="field">
+          <label for="country">Country</label>
+          <select id="country" name="country">
+            <option value="">Select an option</option>
+            <option value="us">United States</option>
+            <option value="ca">Canada</option>
+            <option value="uk">United Kingdom</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="bachelors">
+            Do you have a bachelor's degree or equivalent?
+          </label>
+          <select id="bachelors" name="bachelors">
+            <option value="">Select an option</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="years_experience">
+            How many years of professional software engineering experience do you have?
+          </label>
+          <select id="years_experience" name="years_experience">
+            <option value="">Select an option</option>
+            <option value="0-1">Less than 1 year</option>
+            <option value="1-3">1 - 3 years</option>
+            <option value="3-5">3 - 5 years</option>
+            <option value="5+">5+ years</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="work_auth">
+            Are you legally authorized to work in this country without sponsorship?
+          </label>
+          <select id="work_auth" name="work_auth">
+            <option value="">Select an option</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="skills_list">Technical skills or programming languages</label>
+          <input id="skills_list" name="skills_list" type="text" />
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Submit (mock)</legend>
+        <p style="margin: 0; font-size: 13px; color: #64748b">
+          No backend here — use HireMePlz Fill All to test autofill only.
+        </p>
+      </fieldset>
+    </form>
+  </body>
+</html>

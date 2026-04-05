@@ -17,6 +17,7 @@
     "build": "npm run build --workspace backend && npm run build --workspace frontend && npm run build --workspace extension && npm run build --workspace worker && npm run build --workspace worker-llm",
     "lint": "npm run lint --workspace backend && npm run lint --workspace frontend && npm run lint --workspace extension && npm run lint --workspace worker && npm run lint --workspace worker-llm",
     "db:generate": "npm run db:generate --workspace backend",
-    "db:push": "npm run db:push --workspace backend"
+    "db:push": "npm run db:push --workspace backend",
+    "seed:extension-mock": "node scripts/seed-extension-test-data.mjs"
   }
 }

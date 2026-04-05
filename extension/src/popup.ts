@@ -16,6 +16,8 @@ const saveSettingsBtn = $("save-settings-btn");
 const logoutBtn = $("logout-btn");
 const settingsMsg = $("settings-msg");
 
+const STORAGE_FAB_HIDDEN = "hiremeplz-fab-hidden";
+
 let authMode: "login" | "register" = "login";
 
 async function getStorage<T>(key: string, fallback: T): Promise<T> {
@@ -31,6 +33,22 @@ function showMsg(el: HTMLElement, text: string, type: "error" | "success") {
   el.className = `msg msg-${type}`;
   el.textContent = text;
   setTimeout(() => { el.textContent = ""; el.className = ""; }, 3000);
+}
+
+async function notifyContentActivateFab(): Promise<void> {
+  try {
+    await chrome.storage.local.remove(STORAGE_FAB_HIDDEN);
+  } catch {
+    /* ignore */
+  }
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id != null) {
+      await chrome.tabs.sendMessage(tab.id, { type: "hiremeplz-activate-from-popup" });
+    }
+  } catch {
+    /* Content script not on this page (e.g. chrome://) */
+  }
 }
 
 async function checkServer(apiUrl: string) {
@@ -58,6 +76,7 @@ async function init() {
     loginView.style.display = "none";
     loggedInView.style.display = "block";
     userEmail.textContent = email || "Logged in";
+    await notifyContentActivateFab();
   } else {
     loginView.style.display = "block";
     loggedInView.style.display = "none";
@@ -123,7 +142,7 @@ async function handleLogin() {
       authMode === "register" ? "Account created!" : "Logged in!",
       "success"
     );
-    setTimeout(() => init(), 500);
+    setTimeout(() => void init(), 500);
   } catch {
     showMsg(loginMsg, "Cannot connect to server. Check API Server above.", "error");
   }
@@ -157,23 +176,7 @@ saveSettingsBtn.addEventListener("click", async () => {
 
 logoutBtn.addEventListener("click", async () => {
   await chrome.storage.local.remove(["hiremeplz-token", "hiremeplz-email"]);
-  init();
+  void init();
 });
 
-// Manual token save (dist popup.html uses save-btn + token input)
-const saveBtnEl = document.getElementById("save-btn");
-const tokenInputEl = document.getElementById("token") as HTMLInputElement | null;
-if (saveBtnEl && tokenInputEl) {
-  saveBtnEl.addEventListener("click", async () => {
-    const apiUrl = apiUrlInput.value.trim() || "http://localhost:4000";
-    const token = tokenInputEl.value.trim();
-    await setStorage({ "hiremeplz-api-url": apiUrl });
-    if (token) {
-      await setStorage({ "hiremeplz-token": token });
-    }
-    checkServer(apiUrl);
-    setTimeout(() => init(), 300);
-  });
-}
-
-init();
+void init();

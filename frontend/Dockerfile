@@ -13,6 +13,7 @@ COPY app ./app
 COPY components ./components
 COPY lib ./lib
 COPY types ./types
+COPY public ./public
 
 RUN npm run build
 
